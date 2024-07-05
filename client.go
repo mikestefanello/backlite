@@ -53,6 +53,10 @@ type (
 		// just in case tasks become stuck.
 		ReleaseAfter time.Duration
 
+		// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
+		// tasks. If omitted, no cleanup operations will be performed and the task retention duration will be ignored.
+		CleanupInterval time.Duration
+
 		// TODO hooks (success, failure, deadletter?)
 	}
 )
@@ -86,10 +90,11 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	}
 
 	c.dispatcher = &dispatcher{
-		client:       c,
-		log:          cfg.Logger,
-		numWorkers:   cfg.NumWorkers,
-		releaseAfter: cfg.ReleaseAfter,
+		client:          c,
+		log:             cfg.Logger,
+		numWorkers:      cfg.NumWorkers,
+		releaseAfter:    cfg.ReleaseAfter,
+		cleanupInterval: cfg.CleanupInterval,
 	}
 
 	return c, nil

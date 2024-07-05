@@ -45,6 +45,13 @@ const queryTaskFailed = `
 	WHERE id = ?
 `
 
+const queryDeleteExpiredCompletedTasks = `
+	DELETE FROM backlite_tasks_completed
+	WHERE
+	    expires_at IS NOT NULL
+		AND expires_at <= ?
+`
+
 func queryClaimTasks(count int) string {
 	const query = `
 		UPDATE backlite_tasks

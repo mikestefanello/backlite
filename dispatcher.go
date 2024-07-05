@@ -26,6 +26,10 @@ type (
 		// releaseAfter is the duration to reclaim a task for execution if it has not completed.
 		releaseAfter time.Duration
 
+		// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
+		// tasks.
+		cleanupInterval time.Duration
+
 		// availableWorkers tracks the amount of workers available to receive a task to execute.
 		availableWorkers atomic.Int32
 
@@ -82,8 +86,14 @@ func (d *dispatcher) start(ctx context.Context) {
 		go d.worker()
 	}
 
+	if d.cleanupInterval > 0 {
+		go d.cleaner()
+	}
+
 	go d.triggerer()
 	go d.fetcher()
+
+	d.ready <- struct{}{}
 }
 
 // triggerer listens to the ready channel and sends a trigger to the fetcher only when it is needed which is
@@ -110,6 +120,7 @@ func (d *dispatcher) fetcher() {
 	for {
 		select {
 		case <-d.ticker.C:
+			d.ticker.Stop()
 			d.fetch()
 
 		case <-d.trigger:
@@ -134,6 +145,27 @@ func (d *dispatcher) worker() {
 			d.availableWorkers.Add(1)
 
 		case <-d.ctx.Done():
+			return
+		}
+	}
+}
+
+// cleaner periodically deletes expired completed tasks from the database.
+func (d *dispatcher) cleaner() {
+	ticker := time.NewTicker(d.cleanupInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			_, err := d.client.db.Exec(queryDeleteExpiredCompletedTasks, time.Now().UnixMilli())
+			if err != nil {
+				d.log.Error("failed to delete expired completed tasks",
+					"error", err,
+				)
+			}
+
+		case <-d.ctx.Done():
+			ticker.Stop()
 			return
 		}
 	}
