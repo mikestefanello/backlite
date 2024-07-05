@@ -7,8 +7,8 @@ import (
 
 const queryInsertTask = `
 	INSERT INTO backlite_tasks 
-	    (created_at, queue, task, wait_until) 
-	VALUES (?, ?, ?, ?)
+	    (id, created_at, queue, task, wait_until)
+	VALUES (?, ?, ?, ?, ?)
 `
 
 const querySelectTasks = `
@@ -21,7 +21,7 @@ const querySelectTasks = `
 		OR claimed_at < ?
 	ORDER BY
 	    wait_until ASC,
-		created_at ASC
+		id ASC
 	LIMIT ?
 `
 

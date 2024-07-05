@@ -8,6 +8,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
@@ -202,9 +203,16 @@ func (c *Client) save(op *TaskAddOp) error {
 			return err
 		}
 
+		var id uuid.UUID
+		id, err = uuid.NewV7()
+		if err != nil {
+			return err
+		}
+
 		// Insert the task.
 		_, err = op.tx.Stmt(stm).ExecContext(
 			op.ctx,
+			id.String(),
 			time.Now().UnixMilli(),
 			task.Config().Name,
 			buf.Bytes(),

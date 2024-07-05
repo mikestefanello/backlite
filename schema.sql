@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS backlite_tasks (
-    id text primary key DEFAULT (lower(hex(randomblob(16)))),
+    id text primary key,
     created_at integer NOT NULL,
     queue text NOT NULL,
     task blob NOT NULL,
