@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -199,7 +199,7 @@ func (c *Client) save(op *TaskAddOp) error {
 		buf.Reset()
 
 		// Encode the task.
-		if err = gob.NewEncoder(buf).Encode(task); err != nil {
+		if err = json.NewEncoder(buf).Encode(task); err != nil {
 			return err
 		}
 

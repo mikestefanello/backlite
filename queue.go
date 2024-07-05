@@ -3,7 +3,7 @@ package backlite
 import (
 	"bytes"
 	"context"
-	"encoding/gob"
+	"encoding/json"
 	"time"
 )
 
@@ -86,7 +86,7 @@ func (q *queue[T]) Config() *QueueConfig {
 func (q *queue[T]) Receive(ctx context.Context, payload []byte) error {
 	var obj T
 
-	err := gob.
+	err := json.
 		NewDecoder(bytes.NewReader(payload)).
 		Decode(&obj)
 
