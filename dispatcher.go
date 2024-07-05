@@ -3,6 +3,7 @@ package backlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -178,7 +179,7 @@ func (d *dispatcher) acquireWorkers() int32 {
 		if w := d.availableWorkers.Load(); w > 0 {
 			return w
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond) // TODO use channel instead?
 	}
 }
 
@@ -331,23 +332,13 @@ func (d *dispatcher) schedule(row *taskRow) {
 }
 
 func (d *dispatcher) processTask(row taskRow) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			d.log.Error("panic processing task",
-				"id", row.id,
-				"queue", row.queue,
-				"error", rec,
-			)
-		}
-		// TODO update the db
-	}()
-
 	q := d.client.getQueue(row.queue)
 	cfg := q.Config()
 
 	var ctx context.Context
 	var cancel context.CancelFunc
 
+	// Set a context timeout, if desired.
 	if cfg.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
 		defer cancel()
@@ -355,8 +346,26 @@ func (d *dispatcher) processTask(row taskRow) {
 		ctx = context.Background()
 	}
 
+	// Store the client in the context so the processor can use it.
+	ctx = context.WithValue(ctx, clientCtxKey{}, d.client)
+
 	start := time.Now()
-	err := q.Receive(ctx, row.task) // TODO goroutine in order to timeout?
+
+	// Recover from panics from within the task processor.
+	defer func() {
+		if rec := recover(); rec != nil {
+			d.log.Error("panic processing task",
+				"id", row.id,
+				"queue", row.queue,
+				"error", rec,
+			)
+
+			d.taskFailure(q, row, start, time.Since(start), fmt.Errorf("%v", rec))
+		}
+	}()
+
+	// Process the task and measure the execution duration.
+	err := q.Receive(ctx, row.task)
 	duration := time.Since(start)
 
 	if err != nil {
