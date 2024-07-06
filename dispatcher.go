@@ -4,67 +4,58 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikestefanello/backlite/internal/query"
+	"github.com/mikestefanello/backlite/internal/task"
 	"log/slog"
 	"sync/atomic"
 	"time"
 )
 
-type (
-	// dispatcher handles automatically pulling queued tasks and executing them via queue processors.
-	dispatcher struct {
-		// client is the Client that this dispatcher belongs to.
-		client *Client
+// dispatcher handles automatically pulling queued tasks and executing them via queue processors.
+type dispatcher struct {
+	// client is the Client that this dispatcher belongs to.
+	client *Client
 
-		// log is the logger.
-		log Logger
+	// log is the logger.
+	log Logger
 
-		// ctx stores the context used to start the dispatcher.
-		ctx context.Context
+	// ctx stores the context used to start the dispatcher.
+	ctx context.Context
 
-		// numWorkers is the amount of goroutines opened to execute tasks.
-		numWorkers int
+	// numWorkers is the amount of goroutines opened to execute tasks.
+	numWorkers int
 
-		// releaseAfter is the duration to reclaim a task for execution if it has not completed.
-		releaseAfter time.Duration
+	// releaseAfter is the duration to reclaim a task for execution if it has not completed.
+	releaseAfter time.Duration
 
-		// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
-		// tasks.
-		cleanupInterval time.Duration
+	// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
+	// tasks.
+	cleanupInterval time.Duration
 
-		// availableWorkers tracks the amount of workers available to receive a task to execute.
-		availableWorkers atomic.Int32
+	// availableWorkers tracks the amount of workers available to receive a task to execute.
+	availableWorkers atomic.Int32
 
-		// running indicates if the dispatching is currently running.
-		running atomic.Bool
+	// running indicates if the dispatching is currently running.
+	running atomic.Bool
 
-		// tasks transmits tasks to the workers.
-		tasks chan taskRow
+	// tasks transmits tasks to the workers.
+	tasks chan *task.Task
 
-		// ticker will fetch tasks from the database if the next task is delayed.
-		ticker *time.Ticker
+	// ticker will fetch tasks from the database if the next task is delayed.
+	ticker *time.Ticker
 
-		// ready tells the dispatcher that fetching tasks from the database is required.
-		ready chan struct{}
+	// ready tells the dispatcher that fetching tasks from the database is required.
+	ready chan struct{}
 
-		// trigger instructs the dispatcher to fetch tasks from the database now.
-		trigger chan struct{}
+	// trigger instructs the dispatcher to fetch tasks from the database now.
+	trigger chan struct{}
 
-		// triggered indicates that a trigger was sent but not yet received.
-		// This is used to allow multiple calls to ready, which will happen whenever a task is added,
-		// but only 1 database fetch since that is all that is needed for the dispatcher to be aware of the
-		// current state of the queues.
-		triggered atomic.Bool
-	}
-
-	taskRow struct {
-		id        string
-		queue     string
-		task      []byte
-		attempts  int
-		waitUntil *int64
-		createdAt int64
-	}
-)
+	// triggered indicates that a trigger was sent but not yet received.
+	// This is used to allow multiple calls to ready, which will happen whenever a task is added,
+	// but only 1 database fetch since that is all that is needed for the dispatcher to be aware of the
+	// current state of the queues.
+	triggered atomic.Bool
+}
 
 // start starts the dispatcher.
 // To stop, cancel the provided context.
@@ -76,7 +67,7 @@ func (d *dispatcher) start(ctx context.Context) {
 
 	d.running.Store(true)
 	d.ctx = ctx
-	d.tasks = make(chan taskRow, d.numWorkers)
+	d.tasks = make(chan *task.Task, d.numWorkers)
 	d.ticker = time.NewTicker(time.Second)
 	d.ticker.Stop()                     // No need to tick yet
 	d.ready = make(chan struct{}, 1000) // Prevent blocking task creation
@@ -128,9 +119,9 @@ func (d *dispatcher) fetcher() {
 			d.fetch()
 
 		case <-d.ctx.Done():
+			d.running.Store(false)
 			d.ticker.Stop()
 			close(d.tasks)
-			d.running.Store(false)
 			return
 		}
 	}
@@ -158,7 +149,12 @@ func (d *dispatcher) cleaner() {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := d.client.db.Exec(queryDeleteExpiredCompletedTasks, time.Now().UnixMilli())
+			_, err := d.client.db.ExecContext(
+				d.ctx,
+				query.DeleteExpiredCompletedTasks,
+				time.Now().UnixMilli(),
+			)
+
 			if err != nil {
 				d.log.Error("failed to delete expired completed tasks",
 					"error", err,
@@ -205,11 +201,11 @@ func (d *dispatcher) fetch() {
 
 	// Fetch tasks for each available worker plus the next upcoming task so the scheduler knows when to
 	// query the database again without having to continually poll.
-	rows, err := d.client.db.QueryContext(
+	tasks, err := task.GetScheduledTasks(
 		d.ctx,
-		querySelectTasks,
-		time.Now().Add(-d.releaseAfter).UnixMilli(),
-		workers+1,
+		d.client.db,
+		time.Now().Add(-d.releaseAfter),
+		int(workers)+1,
 	)
 
 	if err != nil {
@@ -219,59 +215,32 @@ func (d *dispatcher) fetch() {
 		return
 	}
 
-	defer func() {
-		if err := rows.Close(); err != nil {
-			d.log.Error("fetch tasks row close failed",
-				"error", err,
-			)
-		}
-	}()
+	var next *task.Task
+	nextUp := func(i int) {
+		next = tasks[i]
+		tasks = tasks[:i]
+	}
 
-	tasks := make([]taskRow, 0, workers)
-	var next *taskRow
-	var rowCount int
-
-	for rows.Next() {
-		var row taskRow
-		err := rows.Scan(&row.id, &row.queue, &row.task, &row.attempts, &row.waitUntil, &row.createdAt)
-
-		if err != nil {
-			d.log.Error("failed scanning task",
-				"error", err,
-			)
-			continue
-		}
-
-		rowCount++
-
-		// Check if the workers are full
-		if int32(rowCount) > workers {
-			next = &row
+	for i := range tasks {
+		// Check if the workers are full.
+		if int32(i+1) > workers {
+			nextUp(i)
 			break
 		}
 
-		// Check if this task is not ready yet
-		if row.waitUntil != nil {
-			if time.UnixMilli(*row.waitUntil).After(time.Now()) {
-				next = &row
+		// Check if this task is not ready yet.
+		if tasks[i].WaitUntil != nil {
+			if tasks[i].WaitUntil.After(time.Now()) {
+				nextUp(i)
 				break
 			}
 		}
-
-		tasks = append(tasks, row)
-	}
-
-	if rows.Err() != nil {
-		d.log.Error("iterating tasks failed",
-			"error", err,
-		)
-		return
 	}
 
 	slog.Info("fetched tasks", "ready", len(tasks), "next", next != nil) // TODO remove
 
 	// Claim the tasks that are ready to be processed.
-	if err := d.claimTasks(d.ctx, tasks); err != nil {
+	if err := tasks.Claim(d.ctx, d.client.db); err != nil {
 		d.log.Error("failed to claim tasks",
 			"error", err,
 		)
@@ -279,9 +248,9 @@ func (d *dispatcher) fetch() {
 	}
 
 	// Send the ready tasks to the workers.
-	for _, row := range tasks {
-		row.attempts++
-		d.tasks <- row
+	for i := range tasks {
+		tasks[i].Attempts++
+		d.tasks <- tasks[i]
 	}
 
 	success = true
@@ -290,38 +259,17 @@ func (d *dispatcher) fetch() {
 	d.schedule(next)
 }
 
-func (d *dispatcher) claimTasks(ctx context.Context, rows []taskRow) error {
-	if len(rows) == 0 {
-		return nil
-	}
-
-	params := make([]any, 0, len(rows)+1)
-	params = append(params, time.Now().UnixMilli())
-
-	for _, row := range rows {
-		params = append(params, row.id)
-	}
-
-	_, err := d.client.db.ExecContext(
-		ctx,
-		queryClaimTasks(len(rows)),
-		params...,
-	)
-	slog.Info("claimed tasks", "len", len(rows)) // TODO remove
-	return err
-}
-
 // schedule handles scheduling the dispatcher based on the next up task provided by the fetcher.
-func (d *dispatcher) schedule(row *taskRow) {
+func (d *dispatcher) schedule(t *task.Task) {
 	d.ticker.Stop()
 
-	if row != nil {
-		if row.waitUntil == nil {
+	if t != nil {
+		if t.WaitUntil == nil {
 			d.ready <- struct{}{}
 			return
 		}
 
-		dur := time.Until(time.UnixMilli(*row.waitUntil))
+		dur := time.Until(*t.WaitUntil)
 		if dur < 0 {
 			d.ready <- struct{}{}
 			return
@@ -331,8 +279,8 @@ func (d *dispatcher) schedule(row *taskRow) {
 	}
 }
 
-func (d *dispatcher) processTask(row taskRow) {
-	q := d.client.getQueue(row.queue)
+func (d *dispatcher) processTask(t *task.Task) {
+	q := d.client.getQueue(t.Queue)
 	cfg := q.Config()
 
 	var ctx context.Context
@@ -355,43 +303,43 @@ func (d *dispatcher) processTask(row taskRow) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			d.log.Error("panic processing task",
-				"id", row.id,
-				"queue", row.queue,
+				"id", t.ID,
+				"queue", t.Queue,
 				"error", rec,
 			)
 
-			d.taskFailure(q, row, start, time.Since(start), fmt.Errorf("%v", rec))
+			d.taskFailure(q, t, start, time.Since(start), fmt.Errorf("%v", rec))
 		}
 	}()
 
 	// Process the task and measure the execution duration.
-	err := q.Receive(ctx, row.task)
+	err := q.Receive(ctx, t.Task)
 	duration := time.Since(start)
 
 	if err != nil {
-		d.taskFailure(q, row, start, duration, err)
+		d.taskFailure(q, t, start, duration, err)
 	} else {
-		d.taskSuccess(q, row, start, duration)
+		d.taskSuccess(q, t, start, duration)
 	}
 }
 
-func (d *dispatcher) taskSuccess(q Queue, row taskRow, started time.Time, dur time.Duration) {
+func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur time.Duration) {
 	var tx *sql.Tx
 	var err error
 
 	defer func() {
 		if err != nil {
 			d.log.Error("failed to update task success",
-				"id", row.id,
-				"queue", row.queue,
+				"id", t.ID,
+				"queue", t.Queue,
 				"error", err,
 			)
 
 			if tx != nil {
 				if err := tx.Rollback(); err != nil {
 					d.log.Error("failed to rollback task success",
-						"id", row.id,
-						"queue", row.queue,
+						"id", t.ID,
+						"queue", t.Queue,
 						"error", err,
 					)
 				}
@@ -402,10 +350,10 @@ func (d *dispatcher) taskSuccess(q Queue, row taskRow, started time.Time, dur ti
 	}()
 
 	d.log.Info("task successfully processed",
-		"id", row.id,
-		"queue", row.queue,
+		"id", t.ID,
+		"queue", t.Queue,
 		"duration", dur,
-		"attempt", row.attempts,
+		"attempt", t.Attempts,
 	)
 
 	tx, err = d.client.db.Begin()
@@ -413,37 +361,32 @@ func (d *dispatcher) taskSuccess(q Queue, row taskRow, started time.Time, dur ti
 		return
 	}
 
-	_, err = tx.Exec(queryDeleteTask, row.id)
+	err = t.DeleteTx(d.ctx, tx) // TODO use this context?
 	if err != nil {
 		return
 	}
 
 	if ret := q.Config().Retention; ret != nil {
-		var expiresAt *int64
-		var payload []byte
+		c := task.Completed{
+			ID:             t.ID,
+			Queue:          t.Queue,
+			Attempts:       t.Attempts,
+			Succeeded:      true,
+			LastDuration:   dur,
+			CreatedAt:      t.CreatedAt,
+			LastExecutedAt: started,
+		}
 
 		if ret.Duration != 0 {
-			at := time.Now().Add(ret.Duration).UnixMilli()
-			expiresAt = &at
+			v := time.Now().Add(ret.Duration)
+			c.ExpiresAt = &v
 		}
 
 		if ret.Data != nil && !ret.Data.OnlyFailed {
-			payload = row.task
+			c.Task = t.Task
 		}
 
-		_, err = tx.Exec(
-			queryInsertCompletedTask,
-			row.id,
-			row.createdAt,
-			q.Config().Name,
-			started.UnixMilli(),
-			row.attempts,
-			dur.Microseconds(),
-			1,
-			payload,
-			expiresAt,
-			nil,
-		)
+		err = c.InsertTx(d.ctx, tx) // TODO use this context?
 		if err != nil {
 			return
 		}
@@ -452,32 +395,34 @@ func (d *dispatcher) taskSuccess(q Queue, row taskRow, started time.Time, dur ti
 	err = tx.Commit()
 }
 
-func (d *dispatcher) taskFailure(q Queue, row taskRow, started time.Time, dur time.Duration, taskErr error) {
+func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur time.Duration, taskErr error) {
+	remaining := q.Config().MaxAttempts - t.Attempts
+
 	d.log.Error("task processing failed",
-		"id", row.id,
-		"queue", row.queue,
+		"id", t.ID,
+		"queue", t.Queue,
 		"duration", dur,
-		"attempt", row.attempts,
-		"remaining", q.Config().MaxAttempts-row.attempts,
+		"attempt", t.Attempts,
+		"remaining", remaining,
 	)
 
-	if row.attempts >= q.Config().MaxAttempts {
+	if remaining < 1 {
 		var tx *sql.Tx
 		var err error
 
 		defer func() {
 			if err != nil {
 				d.log.Error("failed to update task failure",
-					"id", row.id,
-					"queue", row.queue,
+					"id", t.ID,
+					"queue", t.Queue,
 					"error", err,
 				)
 
 				if tx != nil {
 					if err := tx.Rollback(); err != nil {
 						d.log.Error("failed to rollback task failure",
-							"id", row.id,
-							"queue", row.queue,
+							"id", t.ID,
+							"queue", t.Queue,
 							"error", err,
 						)
 					}
@@ -492,37 +437,35 @@ func (d *dispatcher) taskFailure(q Queue, row taskRow, started time.Time, dur ti
 			return
 		}
 
-		_, err = tx.Exec(queryDeleteTask, row.id)
+		err = t.DeleteTx(d.ctx, tx) // TODO use this context?
 		if err != nil {
 			return
 		}
 
 		if ret := q.Config().Retention; ret != nil {
-			var expiresAt *int64
-			var payload []byte
+			errStr := taskErr.Error()
+
+			c := task.Completed{
+				ID:             t.ID,
+				Queue:          t.Queue,
+				Attempts:       t.Attempts,
+				Succeeded:      false,
+				LastDuration:   dur,
+				CreatedAt:      t.CreatedAt,
+				LastExecutedAt: started,
+				Error:          &errStr,
+			}
 
 			if ret.Duration != 0 {
-				at := time.Now().Add(ret.Duration).UnixMilli()
-				expiresAt = &at
+				v := time.Now().Add(ret.Duration)
+				c.ExpiresAt = &v
 			}
 
 			if ret.Data != nil {
-				payload = row.task
+				c.Task = t.Task
 			}
 
-			_, err = tx.Exec(
-				queryInsertCompletedTask,
-				row.id,
-				row.createdAt,
-				q.Config().Name,
-				started.UnixMilli(),
-				row.attempts,
-				dur.Microseconds(),
-				0,
-				payload,
-				expiresAt,
-				taskErr.Error(),
-			)
+			err = c.InsertTx(d.ctx, tx) // TODO use this context?
 			if err != nil {
 				return
 			}
@@ -530,22 +473,23 @@ func (d *dispatcher) taskFailure(q Queue, row taskRow, started time.Time, dur ti
 
 		err = tx.Commit()
 	} else {
-		_, err := d.client.db.Exec(
-			queryTaskFailed,
-			time.Now().Add(q.Config().Backoff).UnixMilli(),
-			started.UnixMilli(),
-			row.id,
-		)
+		t.LastExecutedAt = &started
+
+		err := t.Fail(
+			d.ctx,
+			d.client.db,
+			time.Now().Add(q.Config().Backoff),
+		) // TODO use this context?
 
 		if err != nil {
 			d.log.Error("failed to update task failure",
-				"id", row.id,
-				"queue", row.queue,
+				"id", t.ID,
+				"queue", t.Queue,
 				"error", err,
 			)
 		}
 
-		// TODO schedule?
+		// TODO schedule or just poll?
 		d.ready <- struct{}{}
 	}
 }

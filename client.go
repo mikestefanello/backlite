@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
+	"github.com/mikestefanello/backlite/internal/task"
 	"sync"
 	"time"
 )
@@ -196,42 +196,21 @@ func (c *Client) save(op *TaskAddOp) error {
 		}()
 	}
 
-	stm, err := op.tx.PrepareContext(op.ctx, queryInsertTask)
-	if err != nil {
-		return err
-	}
-
-	var wait *int64
-	if op.wait != nil {
-		m := op.wait.UnixMilli()
-		wait = &m
-	}
-
-	for _, task := range op.tasks {
+	for _, t := range op.tasks {
 		buf.Reset()
 
 		// Encode the task.
-		if err = json.NewEncoder(buf).Encode(task); err != nil {
+		if err = json.NewEncoder(buf).Encode(t); err != nil {
 			return err
 		}
 
-		var id uuid.UUID
-		id, err = uuid.NewV7()
-		if err != nil {
-			return err
+		m := task.Task{
+			Queue:     t.Config().Name,
+			Task:      buf.Bytes(),
+			WaitUntil: op.wait,
 		}
 
-		// Insert the task.
-		_, err = op.tx.Stmt(stm).ExecContext(
-			op.ctx,
-			id.String(),
-			time.Now().UnixMilli(),
-			task.Config().Name,
-			buf.Bytes(),
-			wait,
-		)
-
-		if err != nil {
+		if err = m.InsertTx(op.ctx, op.tx); err != nil {
 			return err
 		}
 	}

@@ -1,17 +1,17 @@
-package backlite
+package query
 
 import (
 	"fmt"
 	"strings"
 )
 
-const queryInsertTask = `
+const InsertTask = `
 	INSERT INTO backlite_tasks 
 	    (id, created_at, queue, task, wait_until)
 	VALUES (?, ?, ?, ?, ?)
 `
 
-const querySelectTasks = `
+const SelectScheduledTasks = `
 	SELECT 
 	    id, queue, task, attempts, wait_until, created_at
 	FROM 
@@ -25,18 +25,18 @@ const querySelectTasks = `
 	LIMIT ?
 `
 
-const queryDeleteTask = `
+const DeleteTask = `
 	DELETE FROM backlite_tasks
 	WHERE id = ?
 `
 
-const queryInsertCompletedTask = `
+const InsertCompletedTask = `
 	INSERT INTO backlite_tasks_completed
 		(id, created_at, queue, last_executed_at, attempts, last_duration_micro, succeeded, task, expires_at, error)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
-const queryTaskFailed = `
+const TaskFailed = `
 	UPDATE backlite_tasks
 	SET 
 	    claimed_at = NULL, 
@@ -45,14 +45,14 @@ const queryTaskFailed = `
 	WHERE id = ?
 `
 
-const queryDeleteExpiredCompletedTasks = `
+const DeleteExpiredCompletedTasks = `
 	DELETE FROM backlite_tasks_completed
 	WHERE
 	    expires_at IS NOT NULL
 		AND expires_at <= ?
 `
 
-func queryClaimTasks(count int) string {
+func ClaimTasks(count int) string {
 	const query = `
 		UPDATE backlite_tasks
 		SET
