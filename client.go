@@ -61,14 +61,14 @@ type (
 		// TODO hooks (success, failure, deadletter?)
 	}
 
-	// clientCtxKey is used to store a Client in a context.
-	clientCtxKey struct{}
+	// ctxKeyClient is used to store a Client in a context.
+	ctxKeyClient struct{}
 )
 
 // FromContext returns a Client from a context which is set for queue processor callbacks, so they can access
 // the client in order to create additional tasks.
 func FromContext(ctx context.Context) *Client {
-	if c, ok := ctx.Value(clientCtxKey{}).(*Client); ok {
+	if c, ok := ctx.Value(ctxKeyClient{}).(*Client); ok {
 		return c
 	}
 	return nil

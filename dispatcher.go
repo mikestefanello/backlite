@@ -175,12 +175,12 @@ func (d *dispatcher) acquireWorkers() int32 {
 // fetch fetches tasks from the database to be executed and/or coordinate the dispatcher, so it is aware of when it
 // needs to fetch again.
 func (d *dispatcher) fetch() {
-	var success bool
+	var err error
 
 	// If we failed at any point, we need to tell the dispatcher to try again.
 	defer func() {
-		if !success {
-			// Wait and try again
+		if err != nil {
+			// Wait and try again.
 			time.Sleep(100 * time.Millisecond)
 			d.ready <- struct{}{}
 		}
@@ -233,7 +233,7 @@ func (d *dispatcher) fetch() {
 	slog.Info("fetched tasks", "ready", len(tasks), "next", next != nil) // TODO remove
 
 	// Claim the tasks that are ready to be processed.
-	if err := tasks.Claim(d.ctx, d.client.db); err != nil {
+	if err = tasks.Claim(d.ctx, d.client.db); err != nil {
 		d.log.Error("failed to claim tasks",
 			"error", err,
 		)
@@ -245,8 +245,6 @@ func (d *dispatcher) fetch() {
 		tasks[i].Attempts++
 		d.tasks <- tasks[i]
 	}
-
-	success = true
 
 	// Adjust the schedule based on the next up task.
 	d.schedule(next)
@@ -288,7 +286,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	}
 
 	// Store the client in the context so the processor can use it.
-	ctx = context.WithValue(ctx, clientCtxKey{}, d.client)
+	ctx = context.WithValue(ctx, ctxKeyClient{}, d.client)
 
 	start := time.Now()
 
