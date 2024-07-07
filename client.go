@@ -144,7 +144,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 }
 
 // Install installs the provided schema in the database.
-// TODO provide robust migrations
+// TODO provide migrations
 func (c *Client) Install() error {
 	_, err := c.db.Exec(schema)
 	return err
@@ -196,10 +196,9 @@ func (c *Client) save(op *TaskAddOp) error {
 		}()
 	}
 
+	// Insert the tasks.
 	for _, t := range op.tasks {
 		buf.Reset()
-
-		// Encode the task.
 		if err = json.NewEncoder(buf).Encode(t); err != nil {
 			return err
 		}

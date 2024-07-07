@@ -7,19 +7,41 @@ import (
 	"time"
 )
 
+// Completed is a completed task.
 type Completed struct {
-	ID             string
-	Queue          string
-	Task           []byte
-	Attempts       int
-	Succeeded      bool
-	LastDuration   time.Duration
-	ExpiresAt      *time.Time
-	CreatedAt      time.Time
+	// ID is the Task ID
+	ID string
+
+	// Queue is the name of the queue this Task belongs to.
+	Queue string
+
+	// Task is the task data.
+	Task []byte
+
+	// Attempts are the amount of times this Task was executed.
+	Attempts int
+
+	// Succeeded indicates if the Task execution was a success.
+	Succeeded bool
+
+	// LastDuration is the last execution duration.
+	LastDuration time.Duration
+
+	// ExpiresAt is when this record should be removed from the database.
+	// If omitted, the record should not be removed.
+	ExpiresAt *time.Time
+
+	// CreatedAt is when the Task was originally created.
+	CreatedAt time.Time
+
+	// LastExecutedAt is the last time this Task executed.
 	LastExecutedAt time.Time
-	Error          *string
+
+	// Error is the error message provided by the Task processor.
+	Error *string
 }
 
+// InsertTx inserts a completed task as part of a database transaction.
 func (c *Completed) InsertTx(ctx context.Context, tx *sql.Tx) error {
 	var expiresAt *int64
 	if c.ExpiresAt != nil {
@@ -40,6 +62,16 @@ func (c *Completed) InsertTx(ctx context.Context, tx *sql.Tx) error {
 		c.Task,
 		expiresAt,
 		c.Error,
+	)
+	return err
+}
+
+// DeleteExpiredCompleted deletes completed tasks that have an expiration date in the past.
+func DeleteExpiredCompleted(ctx context.Context, db *sql.DB) error {
+	_, err := db.ExecContext(
+		ctx,
+		query.DeleteExpiredCompletedTasks,
+		time.Now().UnixMilli(),
 	)
 	return err
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mikestefanello/backlite/internal/query"
 	"github.com/mikestefanello/backlite/internal/task"
 	"log/slog"
 	"sync/atomic"
@@ -149,13 +148,7 @@ func (d *dispatcher) cleaner() {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := d.client.db.ExecContext(
-				d.ctx,
-				query.DeleteExpiredCompletedTasks,
-				time.Now().UnixMilli(),
-			)
-
-			if err != nil {
+			if err := task.DeleteExpiredCompleted(d.ctx, d.client.db); err != nil {
 				d.log.Error("failed to delete expired completed tasks",
 					"error", err,
 				)
