@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mikestefanello/backlite/internal/task"
 	"log/slog"
 	"sync/atomic"
 	"time"
+
+	"github.com/mikestefanello/backlite/internal/task"
 )
 
 // dispatcher handles automatically pulling queued tasks and executing them via queue processors.

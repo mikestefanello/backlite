@@ -3,8 +3,9 @@ package task
 import (
 	"context"
 	"database/sql"
-	"github.com/mikestefanello/backlite/internal/query"
 	"time"
+
+	"github.com/mikestefanello/backlite/internal/query"
 )
 
 // Completed is a completed task.

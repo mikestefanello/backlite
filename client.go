@@ -8,9 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mikestefanello/backlite/internal/task"
 	"sync"
 	"time"
+
+	"github.com/mikestefanello/backlite/internal/task"
 )
 
 //go:embed schema.sql

@@ -3,9 +3,10 @@ package task
 import (
 	"context"
 	"database/sql"
-	"github.com/mikestefanello/backlite/internal/query"
 	"log/slog"
 	"time"
+
+	"github.com/mikestefanello/backlite/internal/query"
 )
 
 type Tasks []*Task
