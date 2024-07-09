@@ -10,16 +10,31 @@ import (
 	"github.com/mikestefanello/backlite/internal/query"
 )
 
+// Task is a task that is queued for execution.
 type Task struct {
-	ID             string
-	Queue          string
-	Task           []byte
-	Attempts       int
-	WaitUntil      *time.Time
-	CreatedAt      time.Time
+	// ID is the Task ID
+	ID string
+
+	// Queue is the name of the queue this Task belongs to.
+	Queue string
+
+	// Task is the task data.
+	Task []byte
+
+	// Attempts are the amount of times this Task was executed.
+	Attempts int
+
+	// WaitUntil is the time the task should not be executed until.
+	WaitUntil *time.Time
+
+	// CreatedAt is when the Task was originally created.
+	CreatedAt time.Time
+
+	// LastExecutedAt is the last time this Task executed.
 	LastExecutedAt *time.Time
 }
 
+// InsertTx inserts a task as part of a database transaction.
 func (t *Task) InsertTx(ctx context.Context, tx *sql.Tx) error {
 	if len(t.ID) == 0 {
 		// UUID is used because it's faster and more reliable than having the DB generate a random string.
@@ -54,11 +69,13 @@ func (t *Task) InsertTx(ctx context.Context, tx *sql.Tx) error {
 	return err
 }
 
+// DeleteTx deletes a task as part of a database transaction.
 func (t *Task) DeleteTx(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, query.DeleteTask, t.ID)
 	return err
 }
 
+// Fail marks a task as failed in the database and queues it to be executed again.
 func (t *Task) Fail(ctx context.Context, db *sql.DB, waitUntil time.Time) error {
 	_, err := db.ExecContext(
 		ctx,

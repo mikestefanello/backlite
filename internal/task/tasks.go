@@ -9,8 +9,10 @@ import (
 	"github.com/mikestefanello/backlite/internal/query"
 )
 
+// Tasks are a slice of tasks.
 type Tasks []*Task
 
+// Claim updates a Task in the database to indicate that it has been claimed by a processor to be executed.
 func (t Tasks) Claim(ctx context.Context, db *sql.DB) error {
 	if len(t) == 0 {
 		return nil
@@ -33,6 +35,7 @@ func (t Tasks) Claim(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// GetTasks loads tasks from the databae using a given query and arguments.
 func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -77,6 +80,9 @@ func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks
 	return tasks, nil
 }
 
+// GetScheduledTasks loads the tasks that are next up to be executed in order of execution time.
+// It's important to note that this does not filter out tasks that are not yet ready based on their wait time.
+// The deadline provided is used to include tasks that have been claimed if that given amount of time has elapsed.
 func GetScheduledTasks(ctx context.Context, db *sql.DB, deadline time.Time, limit int) (Tasks, error) {
 	return GetTasks(
 		ctx,

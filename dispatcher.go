@@ -275,6 +275,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	q := d.client.getQueue(t.Queue)
 	cfg := q.Config()
 
+	var err error
 	var ctx context.Context
 	var cancel context.CancelFunc
 
@@ -287,12 +288,13 @@ func (d *dispatcher) processTask(t *task.Task) {
 	}
 
 	// Store the client in the context so the processor can use it.
+	// TODO include the attempt number
 	ctx = context.WithValue(ctx, ctxKeyClient{}, d.client)
 
 	start := time.Now()
 
-	// Recover from panics from within the task processor.
 	defer func() {
+		// Recover from panics from within the task processor.
 		if rec := recover(); rec != nil {
 			d.log.Error("panic processing task",
 				"id", t.ID,
@@ -300,18 +302,18 @@ func (d *dispatcher) processTask(t *task.Task) {
 				"error", rec,
 			)
 
-			d.taskFailure(q, t, start, time.Since(start), fmt.Errorf("%v", rec))
+			err = fmt.Errorf("%v", rec)
+		}
+
+		// If panic or error, handle the task as a failure.
+		if err != nil {
+			d.taskFailure(q, t, start, time.Since(start), err)
 		}
 	}()
 
-	// Process the task and measure the execution duration.
-	err := q.Receive(ctx, t.Task)
-	duration := time.Since(start)
-
-	if err != nil {
-		d.taskFailure(q, t, start, duration, err)
-	} else {
-		d.taskSuccess(q, t, start, duration)
+	// Process the task.
+	if err = q.Receive(ctx, t.Task); err == nil {
+		d.taskSuccess(q, t, start, time.Since(start))
 	}
 }
 
@@ -341,7 +343,7 @@ func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur t
 		}
 	}()
 
-	d.log.Info("task successfully processed",
+	d.log.Info("task processed",
 		"id", t.ID,
 		"queue", t.Queue,
 		"duration", dur,
@@ -358,30 +360,8 @@ func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur t
 		return
 	}
 
-	if ret := q.Config().Retention; ret != nil {
-		c := task.Completed{
-			ID:             t.ID,
-			Queue:          t.Queue,
-			Attempts:       t.Attempts,
-			Succeeded:      true,
-			LastDuration:   dur,
-			CreatedAt:      t.CreatedAt,
-			LastExecutedAt: started,
-		}
-
-		if ret.Duration != 0 {
-			v := time.Now().Add(ret.Duration)
-			c.ExpiresAt = &v
-		}
-
-		if ret.Data != nil && !ret.Data.OnlyFailed {
-			c.Task = t.Task
-		}
-
-		err = c.InsertTx(d.ctx, tx) // TODO use this context?
-		if err != nil {
-			return
-		}
+	if err = d.taskComplete(tx, q, t, started, dur, nil); err != nil {
+		return
 	}
 
 	err = tx.Commit()
@@ -434,33 +414,8 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 			return
 		}
 
-		if ret := q.Config().Retention; ret != nil {
-			errStr := taskErr.Error()
-
-			c := task.Completed{
-				ID:             t.ID,
-				Queue:          t.Queue,
-				Attempts:       t.Attempts,
-				Succeeded:      false,
-				LastDuration:   dur,
-				CreatedAt:      t.CreatedAt,
-				LastExecutedAt: started,
-				Error:          &errStr,
-			}
-
-			if ret.Duration != 0 {
-				v := time.Now().Add(ret.Duration)
-				c.ExpiresAt = &v
-			}
-
-			if ret.Data != nil {
-				c.Task = t.Task
-			}
-
-			err = c.InsertTx(d.ctx, tx) // TODO use this context?
-			if err != nil {
-				return
-			}
+		if err = d.taskComplete(tx, q, t, started, dur, taskErr); err != nil {
+			return
 		}
 
 		err = tx.Commit()
@@ -484,6 +439,49 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 		// TODO schedule or just poll?
 		d.ready <- struct{}{}
 	}
+}
+
+func (d *dispatcher) taskComplete(
+	tx *sql.Tx,
+	q Queue,
+	t *task.Task,
+	started time.Time,
+	dur time.Duration,
+	taskErr error) error {
+	ret := q.Config().Retention
+	if ret == nil {
+		return nil
+	}
+
+	if taskErr == nil && ret.OnlyFailed {
+		return nil
+	}
+
+	c := task.Completed{
+		ID:             t.ID,
+		Queue:          t.Queue,
+		Attempts:       t.Attempts,
+		Succeeded:      taskErr == nil,
+		LastDuration:   dur,
+		CreatedAt:      t.CreatedAt,
+		LastExecutedAt: started,
+	}
+
+	if taskErr != nil {
+		errStr := taskErr.Error()
+		c.Error = &errStr
+	}
+
+	if ret.Duration != 0 {
+		v := time.Now().Add(ret.Duration)
+		c.ExpiresAt = &v
+	}
+
+	if ret.Data != nil {
+		c.Task = t.Task
+	}
+
+	return c.InsertTx(d.ctx, tx) // TODO use this context?
 }
 
 // notify is used by the client to notify the dispatcher that a new task was added.
