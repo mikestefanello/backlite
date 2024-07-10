@@ -136,12 +136,14 @@ func (c *Client) Add(tasks ...Task) *TaskAddOp {
 }
 
 // Start starts the dispatcher so queued tasks can automatically be executed in the background.
+// To gracefully shut down the dispatcher, call Stop(), or to hard-stop, cancel the provided context.
 func (c *Client) Start(ctx context.Context) {
 	c.dispatcher.start(ctx)
 }
 
-func (c *Client) Shutdown(ctx context.Context) {
-	// TODO needed?
+// Stop attempts to gracefully shut down the dispatcher before the provided context is cancelled.
+func (c *Client) Stop(ctx context.Context) {
+	c.dispatcher.stop(ctx)
 }
 
 // Install installs the provided schema in the database.

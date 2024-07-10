@@ -22,6 +22,12 @@ type dispatcher struct {
 	// ctx stores the context used to start the dispatcher.
 	ctx context.Context
 
+	// shutdownCtx stores an internal context that is used when attempting to gracefully shut down the dispatcher.
+	shutdownCtx context.Context
+
+	// shutdown is the cancel function for cancelling shutdownCtx.
+	shutdown context.CancelFunc
+
 	// numWorkers is the amount of goroutines opened to execute tasks.
 	numWorkers int
 
@@ -32,17 +38,17 @@ type dispatcher struct {
 	// tasks.
 	cleanupInterval time.Duration
 
-	// availableWorkers tracks the amount of workers available to receive a task to execute.
-	availableWorkers atomic.Int32
-
 	// running indicates if the dispatching is currently running.
 	running atomic.Bool
+
+	// ticker will fetch tasks from the database if the next task is delayed.
+	ticker *time.Ticker
 
 	// tasks transmits tasks to the workers.
 	tasks chan *task.Task
 
-	// ticker will fetch tasks from the database if the next task is delayed.
-	ticker *time.Ticker
+	// availableWorkers tracks the amount of workers available to receive a task to execute.
+	availableWorkers chan struct{}
 
 	// ready tells the dispatcher that fetching tasks from the database is required.
 	ready chan struct{}
@@ -58,24 +64,26 @@ type dispatcher struct {
 }
 
 // start starts the dispatcher.
-// To stop, cancel the provided context.
+// To hard-stop, cancel the provided context. To gracefully stop, call stop().
 func (d *dispatcher) start(ctx context.Context) {
-	// Abort if the dispatcher is already running
+	// Abort if the dispatcher is already running.
 	if d.running.Load() {
 		return
 	}
 
-	d.running.Store(true)
 	d.ctx = ctx
+	d.shutdownCtx, d.shutdown = context.WithCancel(context.Background())
 	d.tasks = make(chan *task.Task, d.numWorkers)
 	d.ticker = time.NewTicker(time.Second)
 	d.ticker.Stop()                     // No need to tick yet
 	d.ready = make(chan struct{}, 1000) // Prevent blocking task creation
 	d.trigger = make(chan struct{}, 10) // Should never need more than 1 but just in case
-	d.availableWorkers.Store(int32(d.numWorkers))
+	d.availableWorkers = make(chan struct{}, d.numWorkers)
+	d.running.Store(true)
 
 	for range d.numWorkers {
 		go d.worker()
+		d.availableWorkers <- struct{}{}
 	}
 
 	if d.cleanupInterval > 0 {
@@ -86,6 +94,31 @@ func (d *dispatcher) start(ctx context.Context) {
 	go d.fetcher()
 
 	d.ready <- struct{}{}
+}
+
+// stop attempts to gracefully shut down the dispatcher by blocking until either the context is cancelled or all
+// workers are done with their task.
+func (d *dispatcher) stop(ctx context.Context) {
+	if !d.running.Load() {
+		return
+	}
+
+	// Call the internal shutdown to gracefully close all goroutines.
+	d.shutdown()
+
+	var count int
+
+	select {
+	case <-ctx.Done():
+		return
+
+	case <-d.availableWorkers:
+		count++
+
+		if count == d.numWorkers {
+			return
+		}
+	}
 }
 
 // triggerer listens to the ready channel and sends a trigger to the fetcher only when it is needed which is
@@ -100,6 +133,9 @@ func (d *dispatcher) triggerer() {
 				d.trigger <- struct{}{}
 			}
 
+		case <-d.shutdownCtx.Done():
+			return
+
 		case <-d.ctx.Done():
 			return
 		}
@@ -109,6 +145,12 @@ func (d *dispatcher) triggerer() {
 // fetcher fetches tasks from the database to be executed either when the ticker ticks or when the trigger signal
 // is sent by the triggerer.
 func (d *dispatcher) fetcher() {
+	end := func() {
+		d.running.Store(false)
+		d.ticker.Stop()
+		close(d.tasks)
+	}
+
 	for {
 		select {
 		case <-d.ticker.C:
@@ -118,10 +160,12 @@ func (d *dispatcher) fetcher() {
 		case <-d.trigger:
 			d.fetch()
 
+		case <-d.shutdownCtx.Done():
+			end()
+			return
+
 		case <-d.ctx.Done():
-			d.running.Store(false)
-			d.ticker.Stop()
-			close(d.tasks)
+			end()
 			return
 		}
 	}
@@ -132,9 +176,11 @@ func (d *dispatcher) worker() {
 	for {
 		select {
 		case row := <-d.tasks:
-			d.availableWorkers.Add(-1)
 			d.processTask(row)
-			d.availableWorkers.Add(1)
+			d.availableWorkers <- struct{}{}
+
+		case <-d.shutdownCtx.Done():
+			return
 
 		case <-d.ctx.Done():
 			return
@@ -155,6 +201,9 @@ func (d *dispatcher) cleaner() {
 				)
 			}
 
+		case <-d.shutdownCtx.Done():
+			return
+
 		case <-d.ctx.Done():
 			ticker.Stop()
 			return
@@ -164,12 +213,12 @@ func (d *dispatcher) cleaner() {
 
 // acquireWorkers waits until at least one worker is available to execute a task and returns the number that are
 // available.
-func (d *dispatcher) acquireWorkers() int32 {
+func (d *dispatcher) acquireWorkers() int {
 	for {
-		if w := d.availableWorkers.Load(); w > 0 {
+		if w := len(d.availableWorkers); w > 0 {
 			return w
 		}
-		time.Sleep(100 * time.Millisecond) // TODO use channel instead?
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -217,7 +266,7 @@ func (d *dispatcher) fetch() {
 
 	for i := range tasks {
 		// Check if the workers are full.
-		if int32(i+1) > workers {
+		if (i + 1) > workers {
 			nextUp(i)
 			break
 		}
@@ -244,6 +293,7 @@ func (d *dispatcher) fetch() {
 	// Send the ready tasks to the workers.
 	for i := range tasks {
 		tasks[i].Attempts++
+		<-d.availableWorkers
 		d.tasks <- tasks[i]
 	}
 
@@ -280,6 +330,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	var cancel context.CancelFunc
 
 	// Set a context timeout, if desired.
+	// TODO this is wrong..
 	if cfg.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
 		defer cancel()
@@ -355,7 +406,7 @@ func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur t
 		return
 	}
 
-	err = t.DeleteTx(d.ctx, tx) // TODO use this context?
+	err = t.DeleteTx(d.ctx, tx)
 	if err != nil {
 		return
 	}
@@ -409,7 +460,7 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 			return
 		}
 
-		err = t.DeleteTx(d.ctx, tx) // TODO use this context?
+		err = t.DeleteTx(d.ctx, tx)
 		if err != nil {
 			return
 		}
@@ -426,7 +477,7 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 			d.ctx,
 			d.client.db,
 			time.Now().Add(q.Config().Backoff),
-		) // TODO use this context?
+		)
 
 		if err != nil {
 			d.log.Error("failed to update task failure",
@@ -481,7 +532,7 @@ func (d *dispatcher) taskComplete(
 		c.Task = t.Task
 	}
 
-	return c.InsertTx(d.ctx, tx) // TODO use this context?
+	return c.InsertTx(d.ctx, tx)
 }
 
 // notify is used by the client to notify the dispatcher that a new task was added.
