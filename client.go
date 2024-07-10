@@ -58,8 +58,6 @@ type (
 		// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
 		// tasks. If omitted, no cleanup operations will be performed and the task retention duration will be ignored.
 		CleanupInterval time.Duration
-
-		// TODO hooks (success, failure, deadletter?)
 	}
 
 	// ctxKeyClient is used to store a Client in a context.
@@ -142,8 +140,9 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 // Stop attempts to gracefully shut down the dispatcher before the provided context is cancelled.
-func (c *Client) Stop(ctx context.Context) {
-	c.dispatcher.stop(ctx)
+// True is returned if all workers were able to complete their tasks prior to shutting down.
+func (c *Client) Stop(ctx context.Context) bool {
+	return c.dispatcher.stop(ctx)
 }
 
 // Install installs the provided schema in the database.
@@ -202,6 +201,7 @@ func (c *Client) save(op *TaskAddOp) error {
 	// Insert the tasks.
 	for _, t := range op.tasks {
 		buf.Reset()
+
 		if err = json.NewEncoder(buf).Encode(t); err != nil {
 			return err
 		}
@@ -223,6 +223,7 @@ func (c *Client) save(op *TaskAddOp) error {
 			return err
 		}
 
+		// Tell the dispatcher that a new task has been added.
 		c.dispatcher.notify()
 	}
 

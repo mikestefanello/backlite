@@ -97,10 +97,10 @@ func (d *dispatcher) start(ctx context.Context) {
 }
 
 // stop attempts to gracefully shut down the dispatcher by blocking until either the context is cancelled or all
-// workers are done with their task.
-func (d *dispatcher) stop(ctx context.Context) {
+// workers are done with their task. If all workers are able to complete, true will be returned.
+func (d *dispatcher) stop(ctx context.Context) bool {
 	if !d.running.Load() {
-		return
+		return true
 	}
 
 	// Call the internal shutdown to gracefully close all goroutines.
@@ -108,15 +108,17 @@ func (d *dispatcher) stop(ctx context.Context) {
 
 	var count int
 
-	select {
-	case <-ctx.Done():
-		return
+	for {
+		select {
+		case <-ctx.Done():
+			return false
 
-	case <-d.availableWorkers:
-		count++
+		case <-d.availableWorkers:
+			count++
 
-		if count == d.numWorkers {
-			return
+			if count == d.numWorkers {
+				return true
+			}
 		}
 	}
 }
@@ -149,6 +151,7 @@ func (d *dispatcher) fetcher() {
 		d.running.Store(false)
 		d.ticker.Stop()
 		close(d.tasks)
+		d.log.Info("shutting down dispatcher")
 	}
 
 	for {
@@ -322,20 +325,19 @@ func (d *dispatcher) schedule(t *task.Task) {
 }
 
 func (d *dispatcher) processTask(t *task.Task) {
-	q := d.client.getQueue(t.Queue)
-	cfg := q.Config()
-
 	var err error
 	var ctx context.Context
 	var cancel context.CancelFunc
 
+	q := d.client.getQueue(t.Queue)
+	cfg := q.Config()
+
 	// Set a context timeout, if desired.
-	// TODO this is wrong..
 	if cfg.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
+		ctx, cancel = context.WithTimeout(d.ctx, cfg.Timeout)
 		defer cancel()
 	} else {
-		ctx = context.Background()
+		ctx = d.ctx
 	}
 
 	// Store the client in the context so the processor can use it.
