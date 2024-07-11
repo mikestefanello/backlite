@@ -324,6 +324,7 @@ func (d *dispatcher) schedule(t *task.Task) {
 	}
 }
 
+// processTask attempts to execute a given task.
 func (d *dispatcher) processTask(t *task.Task) {
 	var err error
 	var ctx context.Context
@@ -370,6 +371,8 @@ func (d *dispatcher) processTask(t *task.Task) {
 	}
 }
 
+// taskSuccess handles post successful execution of a given task by removing it from the task table and optionally
+// retaining it in the completed tasks table if the queue settings have retention enabled.
 func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur time.Duration) {
 	var tx *sql.Tx
 	var err error
@@ -391,8 +394,6 @@ func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur t
 					)
 				}
 			}
-
-			// TODO what do we do now?
 		}
 	}()
 
@@ -420,6 +421,9 @@ func (d *dispatcher) taskSuccess(q Queue, t *task.Task, started time.Time, dur t
 	err = tx.Commit()
 }
 
+// taskFailure handles post failed execution of a given task by either releasing it back to the queue, if the maximum
+// amount of attempts haven't been reached, or by deleting it from the task table and optionally moving to the completed
+// task table if the queue has retention enabled.
 func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur time.Duration, taskErr error) {
 	remaining := q.Config().MaxAttempts - t.Attempts
 
@@ -452,8 +456,6 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 						)
 					}
 				}
-
-				// TODO what do we do now?
 			}
 		}()
 
@@ -494,6 +496,7 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 	}
 }
 
+// taskComplete creates a completed task from a given task.
 func (d *dispatcher) taskComplete(
 	tx *sql.Tx,
 	q Queue,
