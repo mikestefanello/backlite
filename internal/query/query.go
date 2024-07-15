@@ -1,9 +1,13 @@
 package query
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 )
+
+//go:embed schema.sql
+var Schema string
 
 const InsertTask = `
 	INSERT INTO backlite_tasks 

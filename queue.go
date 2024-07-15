@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"time"
 )
 
@@ -64,6 +66,12 @@ type (
 
 	// QueueProcessor is a generic processor callback for a given queue to process Tasks
 	QueueProcessor[T Task] func(context.Context, T) error
+
+	// queues stores a registry of queues.
+	queues struct {
+		registry map[string]Queue
+		sync.RWMutex
+	}
 )
 
 // NewQueue creates a new type-safe Queue of a given Task type
@@ -95,4 +103,23 @@ func (q *queue[T]) Receive(ctx context.Context, payload []byte) error {
 	}
 
 	return q.processor(ctx, obj)
+}
+
+// add adds a queue to the registry and will panic if the name has already been registered.
+func (q *queues) add(queue Queue) {
+	q.Lock()
+	defer q.Unlock()
+
+	if _, exists := q.registry[queue.Config().Name]; exists {
+		panic(fmt.Sprintf("queue '%s' already registered", queue.Config().Name))
+	}
+
+	q.registry[queue.Config().Name] = queue
+}
+
+// get loads a queue from the registry by name.
+func (q *queues) get(name string) Queue {
+	q.RLock()
+	defer q.RUnlock()
+	return q.registry[name]
 }

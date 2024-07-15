@@ -35,7 +35,7 @@ func (t Tasks) Claim(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
-// GetTasks loads tasks from the databae using a given query and arguments.
+// GetTasks loads tasks from the database using a given query and arguments.
 func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

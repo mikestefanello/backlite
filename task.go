@@ -37,7 +37,7 @@ func (t *TaskAddOp) At(processAt time.Time) *TaskAddOp {
 
 // Wait instructs the task to wait a given duration before it is executed.
 func (t *TaskAddOp) Wait(duration time.Duration) *TaskAddOp {
-	t.At(time.Now().Add(duration))
+	t.At(now().Add(duration))
 	return t
 }
 

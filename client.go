@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	_ "embed"
+
+	"github.com/mikestefanello/backlite/internal/query"
+
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/mikestefanello/backlite/internal/task"
 )
 
-//go:embed schema.sql
-var schema string
+// now returns the current time in a way that tests can override.
+var now = func() time.Time { return time.Now() }
 
 type (
 	// Client is a client used to register queues and add tasks to them for execution.
@@ -27,10 +28,7 @@ type (
 		log Logger
 
 		// queues stores the registered queues which tasks can be added to.
-		queues map[string]Queue
-
-		// queuesLock provides a lock for the queues.
-		queueLock sync.RWMutex
+		queues queues
 
 		// buffers is a pool of byte buffers for more efficient encoding.
 		buffers sync.Pool
@@ -93,7 +91,7 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 	c := &Client{
 		db:     cfg.DB,
 		log:    cfg.Logger,
-		queues: make(map[string]Queue),
+		queues: queues{registry: make(map[string]Queue)},
 		buffers: sync.Pool{
 			New: func() any {
 				return bytes.NewBuffer(nil)
@@ -115,14 +113,7 @@ func NewClient(cfg ClientConfig) (*Client, error) {
 // Register registers a new Queue so tasks can be added to it.
 // This will panic if the name of the queue provided has already been registered.
 func (c *Client) Register(queue Queue) {
-	c.queueLock.Lock()
-	defer c.queueLock.Unlock()
-
-	if _, exists := c.queues[queue.Config().Name]; exists {
-		panic(fmt.Sprintf("queue '%s' already registered", queue.Config().Name))
-	}
-
-	c.queues[queue.Config().Name] = queue
+	c.queues.add(queue)
 }
 
 // Add starts an operation to add one or many tasks.
@@ -148,7 +139,7 @@ func (c *Client) Stop(ctx context.Context) bool {
 // Install installs the provided schema in the database.
 // TODO provide migrations
 func (c *Client) Install() error {
-	_, err := c.db.Exec(schema)
+	_, err := c.db.Exec(query.Schema)
 	return err
 }
 
@@ -190,7 +181,7 @@ func (c *Client) save(op *TaskAddOp) error {
 				return
 			}
 
-			if err := op.tx.Rollback(); err != nil {
+			if err = op.tx.Rollback(); err != nil {
 				c.log.Error("failed to rollback task creation transaction",
 					"error", err,
 				)
@@ -228,11 +219,4 @@ func (c *Client) save(op *TaskAddOp) error {
 	}
 
 	return nil
-}
-
-// getQueue loads a queue from the registry by name.
-func (c *Client) getQueue(name string) Queue {
-	c.queueLock.RLock()
-	defer c.queueLock.RUnlock()
-	return c.queues[name]
 }

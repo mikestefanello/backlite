@@ -330,7 +330,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	var ctx context.Context
 	var cancel context.CancelFunc
 
-	q := d.client.getQueue(t.Queue)
+	q := d.client.queues.get(t.Queue)
 	cfg := q.Config()
 
 	// Set a context timeout, if desired.
