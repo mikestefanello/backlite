@@ -5,13 +5,12 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/mikestefanello/backlite/internal/query"
-
 	"encoding/json"
 	"errors"
 	"sync"
 	"time"
 
+	"github.com/mikestefanello/backlite/internal/query"
 	"github.com/mikestefanello/backlite/internal/task"
 )
 
@@ -201,6 +200,7 @@ func (c *Client) save(op *TaskAddOp) error {
 			Queue:     t.Config().Name,
 			Task:      buf.Bytes(),
 			WaitUntil: op.wait,
+			CreatedAt: now(),
 		}
 
 		if err = m.InsertTx(op.ctx, op.tx); err != nil {
@@ -215,7 +215,7 @@ func (c *Client) save(op *TaskAddOp) error {
 		}
 
 		// Tell the dispatcher that a new task has been added.
-		c.dispatcher.notify()
+		c.Notify()
 	}
 
 	return nil

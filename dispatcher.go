@@ -266,7 +266,7 @@ func (d *dispatcher) fetch() {
 		next = tasks[i]
 		tasks = tasks[:i]
 	}
-
+	fmt.Println("TASKS", len(tasks))
 	for i := range tasks {
 		// Check if the workers are full.
 		if (i + 1) > workers {

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikestefanello/backlite/internal/testutil"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -28,12 +30,13 @@ func (t testTask) Config() QueueConfig {
 
 func TestMain(m *testing.M) {
 	var err error
+
 	db, err = sql.Open("sqlite3", ":memory:?_journal=WAL&_timeout=1000")
 	if err != nil {
 		panic(err)
 	}
 
-	n := time.Now()
+	n := time.Now().Round(time.Second)
 	now = func() time.Time {
 		return n
 	}
@@ -191,11 +194,38 @@ func TestClient_Add(t *testing.T) {
 }
 
 func TestClient_Start(t *testing.T) {
-	// TODO
+	c := mustNewClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Start(ctx)
+	testutil.Equal(t, "ctx", ctx, c.dispatcher.ctx)
+	testutil.Equal(t, "tasks channel", cap(c.dispatcher.tasks), c.dispatcher.numWorkers)
+	testutil.Equal(t, "ready channel", cap(c.dispatcher.ready), 1000)
+	testutil.Equal(t, "trigger channel", cap(c.dispatcher.trigger), 10)
+	testutil.Equal(t, "available workers channel", cap(c.dispatcher.availableWorkers), c.dispatcher.numWorkers)
+	testutil.Equal(t, "available workers channel length", len(c.dispatcher.availableWorkers), c.dispatcher.numWorkers)
+	testutil.Equal(t, "running", c.dispatcher.running.Load(), true)
+
+	cancel()
+	// TODO need to wait...
+	testutil.Equal(t, "running", c.dispatcher.running.Load(), false)
 }
 
 func TestClient_Stop(t *testing.T) {
-	// TODO
+	c := mustNewClient(t)
+	ctx := context.Background()
+	c.Start(ctx)
+	got := c.Stop(ctx)
+	testutil.Equal(t, "", got, true)
+
+	c = mustNewClient(t)
+	c.Start(ctx)
+	<-c.dispatcher.availableWorkers
+	ctx, cancel := context.WithTimeout(ctx, time.Millisecond)
+	defer cancel()
+	got = c.Stop(ctx)
+	testutil.Equal(t, "", got, false)
+
+	// TODO somehow this is failing randomly
 }
 
 func TestClient_Notify(t *testing.T) {
@@ -210,6 +240,16 @@ func TestClient_Notify(t *testing.T) {
 	default:
 		t.Error("ready signal not sent")
 	}
+}
+
+func TestClient_FromContext(t *testing.T) {
+	got := FromContext(context.Background())
+	testutil.Equal(t, "client", got, nil)
+
+	c := &Client{}
+	ctx := context.WithValue(context.Background(), ctxKeyClient{}, c)
+	got = FromContext(ctx)
+	testutil.Equal(t, "client", got, c)
 }
 
 func mustNewClient(t *testing.T) *Client {
