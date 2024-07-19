@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mikestefanello/backlite/internal/task"
+	"github.com/mikestefanello/backlite/internal/testutil"
 )
 
 func TestTaskAddOp_Ctx(t *testing.T) {
@@ -68,23 +69,63 @@ func TestTaskAddOp_Save(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.dispatcher.ready = make(chan struct{}, 1)
 
 	t.Run("single", func(t *testing.T) {
-		tt := testTask{Val: "a"}
-		op := c.Add(tt)
+		defer testutil.DeleteTasks(t, db)
+		defer c.dispatcher.running.Store(false)
+
+		// Needed to test the notify call.
+		c.dispatcher.running.Store(true)
+
+		tk := testTask{Val: "a"}
+		op := c.Add(tk)
 		if err = op.Save(); err != nil {
 			t.Fatal(err)
 		}
 
-		got := getTasks(t)
+		got := testutil.GetTasks(t, db)
+		testutil.Length(t, got, 1)
 
-		if len(got) != 1 {
-			t.Fatalf("expected 1 task, got %d", len(got))
+		testutil.IsTask(t, task.Task{
+			Queue:     tk.Config().Name,
+			Task:      testutil.Encode(t, tk),
+			Attempts:  0,
+			CreatedAt: now(),
+		}, *got[0])
+
+		select {
+		case <-c.dispatcher.ready:
+		default:
+			t.Error("notify call not made")
+		}
+	})
+
+	t.Run("wait", func(t *testing.T) {
+		defer testutil.DeleteTasks(t, db)
+
+		tk := testTask{Val: "f"}
+		op := c.Add(tk).Wait(time.Hour)
+
+		if err = op.Save(); err != nil {
+			t.Fatal(err)
 		}
 
+		got := testutil.GetTasks(t, db)
+		testutil.Length(t, got, 1)
+
+		testutil.IsTask(t, task.Task{
+			Queue:     tk.Config().Name,
+			Task:      testutil.Encode(t, tk),
+			Attempts:  0,
+			CreatedAt: now(),
+			WaitUntil: testutil.Pointer(now().Add(time.Hour)),
+		}, *got[0])
 	})
 
 	t.Run("multiple", func(t *testing.T) {
+		defer testutil.DeleteTasks(t, db)
+
 		task1 := testTask{Val: "b"}
 		task2 := testTask{Val: "c"}
 		op := c.Add(task1, task2)
@@ -92,13 +133,30 @@ func TestTaskAddOp_Save(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// TODO
+		got := testutil.GetTasks(t, db)
+		testutil.Length(t, got, 2)
+
+		testutil.IsTask(t, task.Task{
+			Queue:     task1.Config().Name,
+			Task:      testutil.Encode(t, task1),
+			Attempts:  0,
+			CreatedAt: now(),
+		}, *got[0])
+
+		testutil.IsTask(t, task.Task{
+			Queue:     task2.Config().Name,
+			Task:      testutil.Encode(t, task2),
+			Attempts:  0,
+			CreatedAt: now(),
+		}, *got[1])
 	})
 
 	t.Run("context", func(t *testing.T) {
+		defer testutil.DeleteTasks(t, db)
+
 		ctx, cancel := context.WithCancel(context.Background())
-		task := testTask{Val: "d"}
-		op := c.Add(task).Ctx(ctx)
+		tk := testTask{Val: "d"}
+		op := c.Add(tk).Ctx(ctx)
 		cancel()
 
 		if err = op.Save(); !errors.Is(err, context.Canceled) {
@@ -107,50 +165,42 @@ func TestTaskAddOp_Save(t *testing.T) {
 	})
 
 	t.Run("transaction", func(t *testing.T) {
-		tx, err := c.db.Begin()
+		defer testutil.DeleteTasks(t, db)
+		defer c.dispatcher.running.Store(false)
+
+		// Needed to test the notify call.
+		c.dispatcher.running.Store(true)
+
+		tx, err := db.Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		task := testTask{Val: "e"}
-		op := c.Add(task).Tx(tx)
+		if err := c.Install(); err != nil {
+			t.Fatal(err)
+		}
+
+		tk := testTask{Val: "e"}
+		op := c.Add(tk).Tx(tx)
 
 		if err = op.Save(); err != nil {
 			t.Fatal(err)
 		}
 
-		// TODO expect nothing yet
+		select {
+		case <-c.dispatcher.ready:
+			t.Error("notify call was made")
+		default:
+		}
+
+		got := testutil.GetTasks(t, db)
+		testutil.Length(t, got, 0)
+
 		if err = tx.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		// TODO
+
+		got = testutil.GetTasks(t, db)
+		testutil.Length(t, got, 1)
 	})
-
-	t.Run("wait", func(t *testing.T) {
-		task := testTask{Val: "f"}
-		op := c.Add(task).Wait(time.Hour)
-
-		if err = op.Save(); err != nil {
-			t.Fatal(err)
-		}
-
-		// TODO
-	})
-}
-
-func getTasks(t *testing.T) task.Tasks {
-	got, err := task.GetTasks(context.Background(), db, `
-		SELECT 
-			id, queue, task, attempts, wait_until, created_at
-		FROM 
-			backlite_tasks
-		ORDER BY
-			id ASC
-	`)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return got
 }
