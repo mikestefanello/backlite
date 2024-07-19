@@ -65,18 +65,21 @@ func TestTaskAddOp_Tx(t *testing.T) {
 
 func TestTaskAddOp_Save(t *testing.T) {
 	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
 	err := c.Install()
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.dispatcher.ready = make(chan struct{}, 1)
+
+	reset := func() {
+		testutil.DeleteTasks(t, db)
+		m = &mockDispatcher{}
+		c.dispatcher = m
+	}
 
 	t.Run("single", func(t *testing.T) {
-		defer testutil.DeleteTasks(t, db)
-		defer c.dispatcher.running.Store(false)
-
-		// Needed to test the notify call.
-		c.dispatcher.running.Store(true)
+		defer reset()
 
 		tk := testTask{Val: "a"}
 		op := c.Add(tk)
@@ -94,15 +97,11 @@ func TestTaskAddOp_Save(t *testing.T) {
 			CreatedAt: now(),
 		}, *got[0])
 
-		select {
-		case <-c.dispatcher.ready:
-		default:
-			t.Error("notify call not made")
-		}
+		testutil.Equal(t, "notified", m.notified, true)
 	})
 
 	t.Run("wait", func(t *testing.T) {
-		defer testutil.DeleteTasks(t, db)
+		defer reset()
 
 		tk := testTask{Val: "f"}
 		op := c.Add(tk).Wait(time.Hour)
@@ -124,7 +123,7 @@ func TestTaskAddOp_Save(t *testing.T) {
 	})
 
 	t.Run("multiple", func(t *testing.T) {
-		defer testutil.DeleteTasks(t, db)
+		defer reset()
 
 		task1 := testTask{Val: "b"}
 		task2 := testTask{Val: "c"}
@@ -152,7 +151,7 @@ func TestTaskAddOp_Save(t *testing.T) {
 	})
 
 	t.Run("context", func(t *testing.T) {
-		defer testutil.DeleteTasks(t, db)
+		defer reset()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		tk := testTask{Val: "d"}
@@ -165,11 +164,7 @@ func TestTaskAddOp_Save(t *testing.T) {
 	})
 
 	t.Run("transaction", func(t *testing.T) {
-		defer testutil.DeleteTasks(t, db)
-		defer c.dispatcher.running.Store(false)
-
-		// Needed to test the notify call.
-		c.dispatcher.running.Store(true)
+		defer reset()
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -187,11 +182,7 @@ func TestTaskAddOp_Save(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		select {
-		case <-c.dispatcher.ready:
-			t.Error("notify call was made")
-		default:
-		}
+		testutil.Equal(t, "notified", m.notified, false)
 
 		got := testutil.GetTasks(t, db)
 		testutil.Length(t, got, 0)

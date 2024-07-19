@@ -33,7 +33,7 @@ type (
 		buffers sync.Pool
 
 		// dispatcher is used to fetch and dispatch queued tasks to the workers for execution.
-		dispatcher *dispatcher
+		dispatcher Dispatcher
 	}
 
 	// ClientConfig contains configuration for the Client.
@@ -126,13 +126,13 @@ func (c *Client) Add(tasks ...Task) *TaskAddOp {
 // Start starts the dispatcher so queued tasks can automatically be executed in the background.
 // To gracefully shut down the dispatcher, call Stop(), or to hard-stop, cancel the provided context.
 func (c *Client) Start(ctx context.Context) {
-	c.dispatcher.start(ctx)
+	c.dispatcher.Start(ctx)
 }
 
 // Stop attempts to gracefully shut down the dispatcher before the provided context is cancelled.
 // True is returned if all workers were able to complete their tasks prior to shutting down.
 func (c *Client) Stop(ctx context.Context) bool {
-	return c.dispatcher.stop(ctx)
+	return c.dispatcher.Stop(ctx)
 }
 
 // Install installs the provided schema in the database.
@@ -146,7 +146,7 @@ func (c *Client) Install() error {
 // This is only needed and required if you supply a database transaction when adding a task.
 // See TaskAddOp.Tx().
 func (c *Client) Notify() {
-	c.dispatcher.notify()
+	c.dispatcher.Notify()
 }
 
 // save saves a task add operation.

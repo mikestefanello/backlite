@@ -11,6 +11,14 @@ import (
 	"github.com/mikestefanello/backlite/internal/task"
 )
 
+type (
+	Dispatcher interface {
+		Start(context.Context)
+		Stop(context.Context) bool
+		Notify()
+	}
+)
+
 // dispatcher handles automatically pulling queued tasks and executing them via queue processors.
 type dispatcher struct {
 	// client is the Client that this dispatcher belongs to.
@@ -63,9 +71,9 @@ type dispatcher struct {
 	triggered atomic.Bool
 }
 
-// start starts the dispatcher.
+// Start starts the dispatcher.
 // To hard-stop, cancel the provided context. To gracefully stop, call stop().
-func (d *dispatcher) start(ctx context.Context) {
+func (d *dispatcher) Start(ctx context.Context) {
 	// Abort if the dispatcher is already running.
 	if d.running.Load() {
 		return
@@ -96,9 +104,9 @@ func (d *dispatcher) start(ctx context.Context) {
 	d.ready <- struct{}{}
 }
 
-// stop attempts to gracefully shut down the dispatcher by blocking until either the context is cancelled or all
+// Stop attempts to gracefully shut down the dispatcher by blocking until either the context is cancelled or all
 // workers are done with their task. If all workers are able to complete, true will be returned.
-func (d *dispatcher) stop(ctx context.Context) bool {
+func (d *dispatcher) Stop(ctx context.Context) bool {
 	if !d.running.Load() {
 		return true
 	}
@@ -540,8 +548,8 @@ func (d *dispatcher) taskComplete(
 	return c.InsertTx(d.ctx, tx)
 }
 
-// notify is used by the client to notify the dispatcher that a new task was added.
-func (d *dispatcher) notify() {
+// Notify is used by the client to notify the dispatcher that a new task was added.
+func (d *dispatcher) Notify() {
 	if d.running.Load() {
 		d.ready <- struct{}{}
 	}

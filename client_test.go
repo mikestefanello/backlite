@@ -28,6 +28,26 @@ func (t testTask) Config() QueueConfig {
 	}
 }
 
+type mockDispatcher struct {
+	started      bool
+	stopped      bool
+	gracefulStop bool
+	notified     bool
+}
+
+func (d *mockDispatcher) Start(_ context.Context) {
+	d.started = true
+}
+
+func (d *mockDispatcher) Stop(_ context.Context) bool {
+	d.stopped = true
+	return d.gracefulStop
+}
+
+func (d *mockDispatcher) Notify() {
+	d.notified = true
+}
+
 func TestMain(m *testing.M) {
 	var err error
 
@@ -57,37 +77,25 @@ func TestNewClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if c.db != db {
-		t.Errorf("db not set")
-	}
-
-	if c.log != slog.Default() {
-		t.Errorf("logger not set")
-	}
-
 	if c.dispatcher == nil {
 		t.Fatal("dispatcher is nil")
 	}
 
-	if c.dispatcher.client != c {
-		t.Error("dispatcher client not set")
+	d, ok := c.dispatcher.(*dispatcher)
+	if !ok {
+		t.Fatalf("dispatcher not set")
 	}
 
-	if c.dispatcher.log != c.log {
-		t.Error("dispatcher log not set")
+	if c.log != slog.Default() {
+		t.Errorf("log wrong value")
 	}
 
-	if c.dispatcher.numWorkers != 2 {
-		t.Error("dispatcher numWorkers not set")
-	}
-
-	if c.dispatcher.releaseAfter != time.Second {
-		t.Error("dispatcher releaseAfter not set")
-	}
-
-	if c.dispatcher.cleanupInterval != time.Hour {
-		t.Error("dispatcher cleanupInterval not set")
-	}
+	testutil.Equal(t, "client", d.client, c)
+	testutil.Equal(t, "db", c.db, db)
+	testutil.Equal(t, "log", d.log, c.log)
+	testutil.Equal(t, "workers", d.numWorkers, 2)
+	testutil.Equal(t, "release after", d.releaseAfter, time.Second)
+	testutil.Equal(t, "cleanup interval", d.cleanupInterval, time.Hour)
 }
 
 func TestNewClient__DefaultLogger(t *testing.T) {
@@ -195,51 +203,36 @@ func TestClient_Add(t *testing.T) {
 
 func TestClient_Start(t *testing.T) {
 	c := mustNewClient(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	c.Start(ctx)
-	testutil.Equal(t, "ctx", ctx, c.dispatcher.ctx)
-	testutil.Equal(t, "tasks channel", cap(c.dispatcher.tasks), c.dispatcher.numWorkers)
-	testutil.Equal(t, "ready channel", cap(c.dispatcher.ready), 1000)
-	testutil.Equal(t, "trigger channel", cap(c.dispatcher.trigger), 10)
-	testutil.Equal(t, "available workers channel", cap(c.dispatcher.availableWorkers), c.dispatcher.numWorkers)
-	testutil.Equal(t, "available workers channel length", len(c.dispatcher.availableWorkers), c.dispatcher.numWorkers)
-	testutil.Equal(t, "running", c.dispatcher.running.Load(), true)
+	m := &mockDispatcher{}
+	c.dispatcher = m
 
-	cancel()
-	// TODO need to wait...
-	testutil.Equal(t, "running", c.dispatcher.running.Load(), false)
+	c.Start(context.Background())
+	testutil.Equal(t, "started", m.started, true)
 }
 
 func TestClient_Stop(t *testing.T) {
 	c := mustNewClient(t)
-	ctx := context.Background()
-	c.Start(ctx)
-	got := c.Stop(ctx)
-	testutil.Equal(t, "", got, true)
+	m := &mockDispatcher{}
+	c.dispatcher = m
 
-	c = mustNewClient(t)
-	c.Start(ctx)
-	<-c.dispatcher.availableWorkers
-	ctx, cancel := context.WithTimeout(ctx, time.Millisecond)
-	defer cancel()
-	got = c.Stop(ctx)
-	testutil.Equal(t, "", got, false)
+	c.Stop(context.Background())
+	testutil.Equal(t, "stopped", m.stopped, true)
+	testutil.Equal(t, "graceful", m.gracefulStop, false)
 
-	// TODO somehow this is failing randomly
+	m.stopped = false
+	m.gracefulStop = true
+	c.Stop(context.Background())
+	testutil.Equal(t, "stopped", m.stopped, true)
+	testutil.Equal(t, "graceful", m.gracefulStop, true)
 }
 
 func TestClient_Notify(t *testing.T) {
 	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
 
-	c.dispatcher.running.Store(true)
-	c.dispatcher.ready = make(chan struct{}, 1)
 	c.Notify()
-
-	select {
-	case <-c.dispatcher.ready:
-	default:
-		t.Error("ready signal not sent")
-	}
+	testutil.Equal(t, "notified", m.notified, true)
 }
 
 func TestClient_FromContext(t *testing.T) {
@@ -264,12 +257,4 @@ func mustNewClient(t *testing.T) *Client {
 	}
 
 	return client
-}
-
-func newDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:?_journal=WAL&_timeout=1000")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return db
 }
