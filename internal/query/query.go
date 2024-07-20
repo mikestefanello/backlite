@@ -17,7 +17,7 @@ const InsertTask = `
 
 const SelectScheduledTasks = `
 	SELECT 
-	    id, queue, task, attempts, wait_until, created_at
+	    id, queue, task, attempts, wait_until, created_at, last_executed_at
 	FROM 
 	    backlite_tasks
 	WHERE

@@ -11,64 +11,70 @@ import (
 )
 
 type (
+	// Dispatcher handles automatically pulling queued tasks and executing them via queue processors.
 	Dispatcher interface {
+		// Start starts the dispatcher.
 		Start(context.Context)
+
+		// Stop stops the dispatcher.
 		Stop(context.Context) bool
+
+		// Notify notifies the dispatcher that a new task has been added.
 		Notify()
 	}
+
+	// dispatcher implements Dispatcher.
+	dispatcher struct {
+		// client is the Client that this dispatcher belongs to.
+		client *Client
+
+		// log is the logger.
+		log Logger
+
+		// ctx stores the context used to start the dispatcher.
+		ctx context.Context
+
+		// shutdownCtx stores an internal context that is used when attempting to gracefully shut down the dispatcher.
+		shutdownCtx context.Context
+
+		// shutdown is the cancel function for cancelling shutdownCtx.
+		shutdown context.CancelFunc
+
+		// numWorkers is the amount of goroutines opened to execute tasks.
+		numWorkers int
+
+		// releaseAfter is the duration to reclaim a task for execution if it has not completed.
+		releaseAfter time.Duration
+
+		// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
+		// tasks.
+		cleanupInterval time.Duration
+
+		// running indicates if the dispatching is currently running.
+		running atomic.Bool
+
+		// ticker will fetch tasks from the database if the next task is delayed.
+		ticker *time.Ticker
+
+		// tasks transmits tasks to the workers.
+		tasks chan *task.Task
+
+		// availableWorkers tracks the amount of workers available to receive a task to execute.
+		availableWorkers chan struct{}
+
+		// ready tells the dispatcher that fetching tasks from the database is required.
+		ready chan struct{}
+
+		// trigger instructs the dispatcher to fetch tasks from the database now.
+		trigger chan struct{}
+
+		// triggered indicates that a trigger was sent but not yet received.
+		// This is used to allow multiple calls to ready, which will happen whenever a task is added,
+		// but only 1 database fetch since that is all that is needed for the dispatcher to be aware of the
+		// current state of the queues.
+		triggered atomic.Bool
+	}
 )
-
-// dispatcher handles automatically pulling queued tasks and executing them via queue processors.
-type dispatcher struct {
-	// client is the Client that this dispatcher belongs to.
-	client *Client
-
-	// log is the logger.
-	log Logger
-
-	// ctx stores the context used to start the dispatcher.
-	ctx context.Context
-
-	// shutdownCtx stores an internal context that is used when attempting to gracefully shut down the dispatcher.
-	shutdownCtx context.Context
-
-	// shutdown is the cancel function for cancelling shutdownCtx.
-	shutdown context.CancelFunc
-
-	// numWorkers is the amount of goroutines opened to execute tasks.
-	numWorkers int
-
-	// releaseAfter is the duration to reclaim a task for execution if it has not completed.
-	releaseAfter time.Duration
-
-	// CleanupInterval is how often to run cleanup operations on the database in order to remove expired completed
-	// tasks.
-	cleanupInterval time.Duration
-
-	// running indicates if the dispatching is currently running.
-	running atomic.Bool
-
-	// ticker will fetch tasks from the database if the next task is delayed.
-	ticker *time.Ticker
-
-	// tasks transmits tasks to the workers.
-	tasks chan *task.Task
-
-	// availableWorkers tracks the amount of workers available to receive a task to execute.
-	availableWorkers chan struct{}
-
-	// ready tells the dispatcher that fetching tasks from the database is required.
-	ready chan struct{}
-
-	// trigger instructs the dispatcher to fetch tasks from the database now.
-	trigger chan struct{}
-
-	// triggered indicates that a trigger was sent but not yet received.
-	// This is used to allow multiple calls to ready, which will happen whenever a task is added,
-	// but only 1 database fetch since that is all that is needed for the dispatcher to be aware of the
-	// current state of the queues.
-	triggered atomic.Bool
-}
 
 // Start starts the dispatcher.
 // To hard-stop, cancel the provided context. To gracefully stop, call stop().
@@ -260,7 +266,7 @@ func (d *dispatcher) fetch() {
 	tasks, err := task.GetScheduledTasks(
 		d.ctx,
 		d.client.db,
-		time.Now().Add(-d.releaseAfter),
+		now().Add(-d.releaseAfter),
 		int(workers)+1,
 	)
 
@@ -286,7 +292,7 @@ func (d *dispatcher) fetch() {
 
 		// Check if this task is not ready yet.
 		if tasks[i].WaitUntil != nil {
-			if tasks[i].WaitUntil.After(time.Now()) {
+			if tasks[i].WaitUntil.After(now()) {
 				nextUp(i)
 				break
 			}
@@ -343,7 +349,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 
 	// Set a context timeout, if desired.
 	if cfg.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(d.ctx, cfg.Timeout)
+		ctx, cancel = context.WithDeadline(d.ctx, now().Add(cfg.Timeout))
 		defer cancel()
 	} else {
 		ctx = d.ctx
@@ -353,7 +359,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	// TODO include the attempt number
 	ctx = context.WithValue(ctx, ctxKeyClient{}, d.client)
 
-	start := time.Now()
+	start := now()
 
 	defer func() {
 		// Recover from panics from within the task processor.
@@ -488,7 +494,7 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 		err := t.Fail(
 			d.ctx,
 			d.client.db,
-			time.Now().Add(q.Config().Backoff),
+			now().Add(q.Config().Backoff),
 		)
 
 		if err != nil {
@@ -537,12 +543,14 @@ func (d *dispatcher) taskComplete(
 	}
 
 	if ret.Duration != 0 {
-		v := time.Now().Add(ret.Duration)
+		v := now().Add(ret.Duration)
 		c.ExpiresAt = &v
 	}
 
 	if ret.Data != nil {
-		c.Task = t.Task
+		if !ret.Data.OnlyFailed || taskErr != nil {
+			c.Task = t.Task
+		}
 	}
 
 	return c.InsertTx(d.ctx, tx)

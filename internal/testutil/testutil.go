@@ -19,7 +19,7 @@ import (
 func GetTasks(t *testing.T, db *sql.DB) task.Tasks {
 	got, err := task.GetTasks(context.Background(), db, `
 		SELECT 
-			id, queue, task, attempts, wait_until, created_at
+			id, queue, task, attempts, wait_until, created_at, last_executed_at
 		FROM 
 			backlite_tasks
 		ORDER BY
@@ -31,6 +31,21 @@ func GetTasks(t *testing.T, db *sql.DB) task.Tasks {
 	}
 
 	return got
+}
+
+func InsertTask(t *testing.T, db *sql.DB, tk *task.Task) {
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tk.InsertTx(context.Background(), tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func DeleteTasks(t *testing.T, db *sql.DB) {
@@ -87,7 +102,7 @@ func Equal[T comparable](t *testing.T, name string, expected, got T) {
 
 func Length[T any](t *testing.T, obj []T, expectedLength int) {
 	if len(obj) != expectedLength {
-		t.Errorf("expected %d items, got %d", len(obj), expectedLength)
+		t.Errorf("expected %d items, got %d", expectedLength, len(obj))
 	}
 }
 

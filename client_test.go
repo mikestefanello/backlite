@@ -10,17 +10,6 @@ import (
 	"github.com/mikestefanello/backlite/internal/testutil"
 )
 
-type testTask struct {
-	Val string
-}
-
-func (t testTask) Config() QueueConfig {
-	return QueueConfig{
-		Name:        "test",
-		MaxAttempts: 1,
-	}
-}
-
 type mockDispatcher struct {
 	started      bool
 	stopped      bool
@@ -42,7 +31,7 @@ func (d *mockDispatcher) Notify() {
 }
 
 func TestMain(m *testing.M) {
-	n := time.Now().Round(time.Second)
+	n := time.Now().Round(time.Millisecond)
 	now = func() time.Time {
 		return n
 	}

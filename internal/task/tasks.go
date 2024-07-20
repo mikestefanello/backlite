@@ -49,7 +49,7 @@ func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks
 	for rows.Next() {
 		var task Task
 		var createdAt int64
-		var waitUntil *int64
+		var waitUntil, lastExecutedAt *int64
 
 		err = rows.Scan(
 			&task.ID,
@@ -58,6 +58,7 @@ func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks
 			&task.Attempts,
 			&waitUntil,
 			&createdAt,
+			&lastExecutedAt,
 		)
 
 		if err != nil {
@@ -65,9 +66,15 @@ func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks
 		}
 
 		task.CreatedAt = time.UnixMilli(createdAt)
+
 		if waitUntil != nil {
 			v := time.UnixMilli(*waitUntil)
 			task.WaitUntil = &v
+		}
+
+		if lastExecutedAt != nil {
+			v := time.UnixMilli(*lastExecutedAt)
+			task.LastExecutedAt = &v
 		}
 
 		tasks = append(tasks, &task)
