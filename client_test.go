@@ -2,19 +2,12 @@ package backlite
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/mikestefanello/backlite/internal/testutil"
-
-	_ "github.com/mattn/go-sqlite3"
-)
-
-var (
-	db *sql.DB
 )
 
 type testTask struct {
@@ -49,13 +42,6 @@ func (d *mockDispatcher) Notify() {
 }
 
 func TestMain(m *testing.M) {
-	var err error
-
-	db, err = sql.Open("sqlite3", ":memory:?_journal=WAL&_timeout=1000")
-	if err != nil {
-		panic(err)
-	}
-
 	n := time.Now().Round(time.Second)
 	now = func() time.Time {
 		return n
@@ -65,6 +51,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewClient(t *testing.T) {
+	db := testutil.NewDB(t)
+	defer db.Close()
+
 	c, err := NewClient(ClientConfig{
 		DB:              db,
 		Logger:          slog.Default(),
@@ -83,19 +72,19 @@ func TestNewClient(t *testing.T) {
 
 	d, ok := c.dispatcher.(*dispatcher)
 	if !ok {
-		t.Fatalf("dispatcher not set")
+		t.Fatal("dispatcher not set")
 	}
 
 	if c.log != slog.Default() {
-		t.Errorf("log wrong value")
+		t.Error("log wrong value")
 	}
 
-	testutil.Equal(t, "client", d.client, c)
-	testutil.Equal(t, "db", c.db, db)
+	testutil.Equal(t, "client", c, d.client)
+	testutil.Equal(t, "db", db, c.db)
 	testutil.Equal(t, "log", d.log, c.log)
-	testutil.Equal(t, "workers", d.numWorkers, 2)
-	testutil.Equal(t, "release after", d.releaseAfter, time.Second)
-	testutil.Equal(t, "cleanup interval", d.cleanupInterval, time.Hour)
+	testutil.Equal(t, "workers", 2, d.numWorkers)
+	testutil.Equal(t, "release after", time.Second, d.releaseAfter)
+	testutil.Equal(t, "cleanup interval", time.Hour, d.cleanupInterval)
 }
 
 func TestNewClient__DefaultLogger(t *testing.T) {
@@ -112,6 +101,9 @@ func TestNewClient__DefaultLogger(t *testing.T) {
 }
 
 func TestNewClient__Validation(t *testing.T) {
+	db := testutil.NewDB(t)
+	defer db.Close()
+
 	_, err := NewClient(ClientConfig{
 		DB:           nil,
 		NumWorkers:   1,
@@ -171,12 +163,12 @@ func TestClient_Install(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = db.Exec("SELECT 1 FROM backlite_tasks")
+	_, err = c.db.Exec("SELECT 1 FROM backlite_tasks")
 	if err != nil {
 		t.Error("table backlite_tasks not created")
 	}
 
-	_, err = db.Exec("SELECT 1 FROM backlite_tasks_completed")
+	_, err = c.db.Exec("SELECT 1 FROM backlite_tasks_completed")
 	if err != nil {
 		t.Error("table backlite_tasks_completed not created")
 	}
@@ -207,7 +199,7 @@ func TestClient_Start(t *testing.T) {
 	c.dispatcher = m
 
 	c.Start(context.Background())
-	testutil.Equal(t, "started", m.started, true)
+	testutil.Equal(t, "started", true, m.started)
 }
 
 func TestClient_Stop(t *testing.T) {
@@ -216,14 +208,14 @@ func TestClient_Stop(t *testing.T) {
 	c.dispatcher = m
 
 	c.Stop(context.Background())
-	testutil.Equal(t, "stopped", m.stopped, true)
-	testutil.Equal(t, "graceful", m.gracefulStop, false)
+	testutil.Equal(t, "stopped", true, m.stopped)
+	testutil.Equal(t, "graceful", false, m.gracefulStop)
 
 	m.stopped = false
 	m.gracefulStop = true
 	c.Stop(context.Background())
-	testutil.Equal(t, "stopped", m.stopped, true)
-	testutil.Equal(t, "graceful", m.gracefulStop, true)
+	testutil.Equal(t, "stopped", true, m.stopped)
+	testutil.Equal(t, "graceful", true, m.gracefulStop)
 }
 
 func TestClient_Notify(t *testing.T) {
@@ -232,7 +224,7 @@ func TestClient_Notify(t *testing.T) {
 	c.dispatcher = m
 
 	c.Notify()
-	testutil.Equal(t, "notified", m.notified, true)
+	testutil.Equal(t, "notified", true, m.notified)
 }
 
 func TestClient_FromContext(t *testing.T) {
@@ -247,7 +239,7 @@ func TestClient_FromContext(t *testing.T) {
 
 func mustNewClient(t *testing.T) *Client {
 	client, err := NewClient(ClientConfig{
-		DB:              db,
+		DB:              testutil.NewDB(t),
 		NumWorkers:      1,
 		ReleaseAfter:    time.Hour,
 		CleanupInterval: 6 * time.Hour,

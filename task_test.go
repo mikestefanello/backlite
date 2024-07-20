@@ -63,135 +63,131 @@ func TestTaskAddOp_Tx(t *testing.T) {
 	}
 }
 
-func TestTaskAddOp_Save(t *testing.T) {
+func TestTaskAddOp_Save__Single(t *testing.T) {
 	c := mustNewClient(t)
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	err := c.Install()
+	defer c.db.Close()
+
+	tk := testTask{Val: "a"}
+	op := c.Add(tk)
+	if err := op.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := testutil.GetTasks(t, c.db)
+	testutil.Length(t, got, 1)
+
+	testutil.IsTask(t, task.Task{
+		Queue:     tk.Config().Name,
+		Task:      testutil.Encode(t, tk),
+		Attempts:  0,
+		CreatedAt: now(),
+	}, *got[0])
+
+	testutil.Equal(t, "notified", true, m.notified)
+}
+
+func TestTaskAddOp_Save__Wait(t *testing.T) {
+	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
+	defer c.db.Close()
+
+	tk := testTask{Val: "f"}
+	op := c.Add(tk).Wait(time.Hour)
+
+	if err := op.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := testutil.GetTasks(t, c.db)
+	testutil.Length(t, got, 1)
+
+	testutil.IsTask(t, task.Task{
+		Queue:     tk.Config().Name,
+		Task:      testutil.Encode(t, tk),
+		Attempts:  0,
+		CreatedAt: now(),
+		WaitUntil: testutil.Pointer(now().Add(time.Hour)),
+	}, *got[0])
+}
+
+func TestTaskAddOp_Save__Multiple(t *testing.T) {
+	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
+	defer c.db.Close()
+
+	task1 := testTask{Val: "b"}
+	task2 := testTask{Val: "c"}
+	op := c.Add(task1, task2)
+	if err := op.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := testutil.GetTasks(t, c.db)
+	testutil.Length(t, got, 2)
+
+	testutil.IsTask(t, task.Task{
+		Queue:     task1.Config().Name,
+		Task:      testutil.Encode(t, task1),
+		Attempts:  0,
+		CreatedAt: now(),
+	}, *got[0])
+
+	testutil.IsTask(t, task.Task{
+		Queue:     task2.Config().Name,
+		Task:      testutil.Encode(t, task2),
+		Attempts:  0,
+		CreatedAt: now(),
+	}, *got[1])
+}
+
+func TestTaskAddOp_Save__Context(t *testing.T) {
+	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
+	defer c.db.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	tk := testTask{Val: "d"}
+	op := c.Add(tk).Ctx(ctx)
+	cancel()
+
+	if err := op.Save(); !errors.Is(err, context.Canceled) {
+		t.Error("expected context cancel")
+	}
+}
+
+func TestTaskAddOp_Save__Transaction(t *testing.T) {
+	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
+	defer c.db.Close()
+
+	tx, err := c.db.Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	reset := func() {
-		testutil.DeleteTasks(t, db)
-		m = &mockDispatcher{}
-		c.dispatcher = m
+	if err := c.Install(); err != nil {
+		t.Fatal(err)
 	}
 
-	t.Run("single", func(t *testing.T) {
-		defer reset()
+	tk := testTask{Val: "e"}
+	op := c.Add(tk).Tx(tx)
 
-		tk := testTask{Val: "a"}
-		op := c.Add(tk)
-		if err = op.Save(); err != nil {
-			t.Fatal(err)
-		}
+	if err = op.Save(); err != nil {
+		t.Fatal(err)
+	}
 
-		got := testutil.GetTasks(t, db)
-		testutil.Length(t, got, 1)
+	testutil.Equal(t, "notified", false, m.notified)
 
-		testutil.IsTask(t, task.Task{
-			Queue:     tk.Config().Name,
-			Task:      testutil.Encode(t, tk),
-			Attempts:  0,
-			CreatedAt: now(),
-		}, *got[0])
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
 
-		testutil.Equal(t, "notified", m.notified, true)
-	})
-
-	t.Run("wait", func(t *testing.T) {
-		defer reset()
-
-		tk := testTask{Val: "f"}
-		op := c.Add(tk).Wait(time.Hour)
-
-		if err = op.Save(); err != nil {
-			t.Fatal(err)
-		}
-
-		got := testutil.GetTasks(t, db)
-		testutil.Length(t, got, 1)
-
-		testutil.IsTask(t, task.Task{
-			Queue:     tk.Config().Name,
-			Task:      testutil.Encode(t, tk),
-			Attempts:  0,
-			CreatedAt: now(),
-			WaitUntil: testutil.Pointer(now().Add(time.Hour)),
-		}, *got[0])
-	})
-
-	t.Run("multiple", func(t *testing.T) {
-		defer reset()
-
-		task1 := testTask{Val: "b"}
-		task2 := testTask{Val: "c"}
-		op := c.Add(task1, task2)
-		if err = op.Save(); err != nil {
-			t.Fatal(err)
-		}
-
-		got := testutil.GetTasks(t, db)
-		testutil.Length(t, got, 2)
-
-		testutil.IsTask(t, task.Task{
-			Queue:     task1.Config().Name,
-			Task:      testutil.Encode(t, task1),
-			Attempts:  0,
-			CreatedAt: now(),
-		}, *got[0])
-
-		testutil.IsTask(t, task.Task{
-			Queue:     task2.Config().Name,
-			Task:      testutil.Encode(t, task2),
-			Attempts:  0,
-			CreatedAt: now(),
-		}, *got[1])
-	})
-
-	t.Run("context", func(t *testing.T) {
-		defer reset()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		tk := testTask{Val: "d"}
-		op := c.Add(tk).Ctx(ctx)
-		cancel()
-
-		if err = op.Save(); !errors.Is(err, context.Canceled) {
-			t.Error("expected context cancel")
-		}
-	})
-
-	t.Run("transaction", func(t *testing.T) {
-		defer reset()
-
-		tx, err := db.Begin()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := c.Install(); err != nil {
-			t.Fatal(err)
-		}
-
-		tk := testTask{Val: "e"}
-		op := c.Add(tk).Tx(tx)
-
-		if err = op.Save(); err != nil {
-			t.Fatal(err)
-		}
-
-		testutil.Equal(t, "notified", m.notified, false)
-
-		got := testutil.GetTasks(t, db)
-		testutil.Length(t, got, 0)
-
-		if err = tx.Commit(); err != nil {
-			t.Fatal(err)
-		}
-
-		got = testutil.GetTasks(t, db)
-		testutil.Length(t, got, 1)
-	})
+	got := testutil.GetTasks(t, c.db)
+	testutil.Length(t, got, 1)
 }

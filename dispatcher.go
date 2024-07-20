@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"sync/atomic"
 	"time"
 
@@ -187,6 +186,9 @@ func (d *dispatcher) worker() {
 	for {
 		select {
 		case row := <-d.tasks:
+			if row == nil {
+				break
+			}
 			d.processTask(row)
 			d.availableWorkers <- struct{}{}
 
@@ -274,7 +276,7 @@ func (d *dispatcher) fetch() {
 		next = tasks[i]
 		tasks = tasks[:i]
 	}
-	fmt.Println("TASKS", len(tasks))
+
 	for i := range tasks {
 		// Check if the workers are full.
 		if (i + 1) > workers {
@@ -290,8 +292,6 @@ func (d *dispatcher) fetch() {
 			}
 		}
 	}
-
-	slog.Info("fetched tasks", "ready", len(tasks), "next", next != nil) // TODO remove
 
 	// Claim the tasks that are ready to be processed.
 	if err = tasks.Claim(d.ctx, d.client.db); err != nil {
