@@ -107,6 +107,8 @@ func (d *dispatcher) Start(ctx context.Context) {
 	go d.fetcher()
 
 	d.ready <- struct{}{}
+
+	d.log.Info("task dispatcher started")
 }
 
 // Stop attempts to gracefully shut down the dispatcher by blocking until either the context is cancelled or all
