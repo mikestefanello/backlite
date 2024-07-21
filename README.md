@@ -35,6 +35,7 @@
     * [Declaring a Task type](#declaring-a-task-type)
     * [Queue processor](#queue-processor)
     * [Registering a queue](#registering-a-queue)
+    * [Adding tasks](#adding-tasks)
     * [Starting the dispatcher](#starting-the-dispatcher)
     * [Shutting down the dispatcher](#shutting-down-the-dispatcher)
 * [Roadmap](#roadmap)
@@ -130,27 +131,130 @@ A simple web UI to monitor running, upcoming, and completed tasks is provided bu
 
 ### Client initialization
 
+First, open a connection to your SQLite database using the driver of your choice:
 
+```go
+db, err := sql.Open("sqlite3", "data.db?_journal=WAL&_timeout=5000")
+```
+
+Second, initialize a client:
+
+```go
+client, err := backlite.NewClient(backlite.ClientConfig{
+    DB:              db,
+    Logger:          slog.Default(),
+    ReleaseAfter:    10 * time.Minute,
+    NumWorkers:      10,
+    CleanupInterval: time.Hour,
+})
+```
+
+The configuration options are:
+
+* **DB**: The database connection.
+* **Logger**: A logger that implements the `Logger` interface. Omit if you do not want to log.
+* **ReleaseAfter**: The duration after which tasks claimed and passed for execution should be added back to the queue if a response was never received.
+* **NumWorkers**: The amount of goroutines to open which will process queued tasks.
+* **CleanupInterval**: How often the completed tasks database table will attempt to remove expired rows.
 
 ### Declaring a Task type
 
+Any type can be a task as long as it implements the `Task` interface, which requires only the `Config() QueueConfig` method, used to provide information about the queue that these tasks will be added to. As an example, this is a task used to send new order email notifications:
 
+```go
+type NewOrderEmailTask struct {
+    OrderID string
+    EmailAddress string
+}
+```
+
+Then implement the `Task` interface by providing the queue configuration:
+
+```go
+func (t NewOrderEmailTask) Config() backlite.QueueConfig {
+    return backlite.QueueConfig{
+		Name:        "NewOrderEmail",
+		MaxAttempts: 5,
+		Backoff:     5 * time.Second,
+		Timeout:     10 * time.Second,
+		Retention: &backlite.Retention{
+			Duration:   6 * time.Hour,
+			OnlyFailed: false,
+			Data: &backlite.RetainData{
+				OnlyFailed: true,
+			},
+		},
+    }
+}
+```
+
+The configuration options are:
+
+* **Name**: The name of the queue. This must be unique otherwise registering the queue will fail.
+* **MaxAttempts**: The maximum number of times to try executing this task before it's consider failed and marked as complete.
+* **Backoff**: The amount of time to wait before retrying after a failed attempt at processing.
+* **Retention**: If provided, completed tasks will be retained in the database in a separate table according to the included options.
+    * **Duration**: How long to retain completed tasks in the database for.
+    * **OnlyFailed**: If true, only failed tasks will be retained.
+    * **Data**: If provided, the task data (the serialized task itself) will be retained.
+        * **OnlyFailed**: If true, the task data will only be retained for failed tasks.
 
 ### Queue processor
 
+The easiest way to implement a queue and define the processor is to use `backlite.NewQueue()`. This leverages generics in order to provide type-safety with a given task type. Using the example above:
 
+```go
+queue := NewQueue[NewOrderEmailTask](func(ctx context.Context, task NewOrderEmailTask) error {
+    return email.Send(ctx, task.EmailAddress, fmt.Sprintf("Order %s received", task.OrderID))
+})
+```
+
+The parameter is the processor callback which is what will be called by the dispatcher worker pool to execute the task. If no error is returned, the task is considered successfully executed. If the task fails all attempts and the queue has rention enabled, the value of the error will be stored in the database.
+
+The provided context will be set to timeout at the duration set in the queue settings, if provided. To get the client from the context, you can call `client := backlite.FromContext(ctx)`.
 
 ### Registering a queue
 
+You must register all queues with the client by calling `client.Register(queue)`. This will panic if duplicate queue names are registered.
 
+### Adding tasks
+
+To add a task to the queue, simply pass one or many in to `client.Add()`. You can provide tasks of different types. This returns a chainable operation which contains many options, that can be used as follows:
+
+```go
+err := client.
+    Add(task1, task2).
+    Ctx(ctx).
+    Tx(tx).
+    At(time.Date(2024, 1, 5, 12, 30, 00)).
+    Wait(15 * time.Minute).
+    Save()
+```
+
+Only `Add()` and `Save()` are required. The following options are:
+
+* **Ctx**: Provide a context to use for the operation.
+* **Tx**: Provide a database transaction to add the tasks to. You must commit this yourself then call `client.Notify()` to tell the dispatcher that the new task(s) were added. This may be improved in the future but for now it is required.
+* **At**: Don't execute this task until at least the given date and time.
+* **Wait**: Wait at least the given duration before executing the task.
 
 ### Starting the dispatcher
 
-
+To start the dispatcher, which will spin up the worker pool and begin executing tasks in the background, call `client.Start()`. The context you pass in must persist for as long as you want the dispatcher to continue working. If that is ever cancelled, the dispatcher will shutdown. See the next section for more details.
 
 ### Shutting down the dispatcher
 
+To gracefully shutdown the dispatcher, which will wait until all tasks currently being executed are finished, call `client.Stop()`. You can provide a context with a given timeout in order to give the shutdown process a set amount of time to gracefully shutdown. For example:
 
+```
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+client.Stop(ctx)
+```
+
+This will wait up to 5 seconds for all workers to complete the task they are currently working on.
+
+If you want to hard-stop the dispatcher, cancel the context that was provided when calling `client.Start()`.
 
 ## Roadmap
 
