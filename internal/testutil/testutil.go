@@ -48,6 +48,20 @@ func InsertTask(t *testing.T, db *sql.DB, tk *task.Task) {
 	}
 }
 
+func TaskIDsExist(t *testing.T, db *sql.DB, ids []string) {
+	idMap := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idMap[id] = struct{}{}
+	}
+	for _, tc := range GetTasks(t, db) {
+		delete(idMap, tc.ID)
+	}
+
+	if len(idMap) != 0 {
+		t.Errorf("ids do not exist: %v", idMap)
+	}
+}
+
 func DeleteTasks(t *testing.T, db *sql.DB) {
 	_, err := db.Exec("DELETE FROM backlite_tasks")
 	if err != nil {
@@ -91,6 +105,20 @@ func InsertCompleted(t *testing.T, db *sql.DB, completed task.Completed) {
 
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func CompleteTaskIDsExist(t *testing.T, db *sql.DB, ids []string) {
+	idMap := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idMap[id] = struct{}{}
+	}
+	for _, tc := range GetCompletedTasks(t, db) {
+		delete(idMap, tc.ID)
+	}
+
+	if len(idMap) != 0 {
+		t.Errorf("ids do not exist: %v", idMap)
 	}
 }
 

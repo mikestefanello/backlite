@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -170,20 +171,6 @@ func TestDispatcher_Cleaner(t *testing.T) {
 		log:        &noLogger{},
 	}
 
-	idsExist := func(ids []string) {
-		idMap := make(map[string]struct{}, len(ids))
-		for _, id := range ids {
-			idMap[id] = struct{}{}
-		}
-		for _, tc := range testutil.GetCompletedTasks(t, db) {
-			delete(idMap, tc.ID)
-		}
-
-		if len(idMap) != 0 {
-			t.Errorf("ids do not exist: %v", idMap)
-		}
-	}
-
 	tc := task.Completed{
 		Queue:          "test",
 		Task:           nil,
@@ -228,9 +215,9 @@ func TestDispatcher_Cleaner(t *testing.T) {
 	testutil.InsertCompleted(t, db, tc)
 	d.Start(context.Background())
 	testutil.Wait()
-	idsExist([]string{"2", "3", "5"})
+	testutil.CompleteTaskIDsExist(t, db, []string{"2", "3", "5"})
 	testutil.Wait()
-	idsExist([]string{"2", "3"})
+	testutil.CompleteTaskIDsExist(t, db, []string{"2", "3"})
 	d.Stop(context.Background())
 }
 
@@ -578,6 +565,115 @@ func TestDispatcher_ProcessTask__Failure(t *testing.T) {
 
 	if ct[0].LastDuration <= 0 {
 		t.Error("last duration not set")
+	}
+}
+
+func TestDispatcher_Fetcher(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := newDispatcher(t)
+	d.ctx = ctx
+	d.shutdownCtx = ctx
+	d.ticker = time.NewTicker(1 * time.Hour)
+	d.tasks = make(chan *task.Task, d.numWorkers)
+	d.ready = make(chan struct{}, 1)
+	d.trigger = make(chan struct{}, 1)
+	d.availableWorkers = make(chan struct{}, d.numWorkers)
+	hold := make(chan struct{}, d.numWorkers)
+
+	for range d.numWorkers {
+		go d.worker()
+		d.availableWorkers <- struct{}{}
+	}
+
+	d.client.Register(NewQueue[testTask](func(ctx context.Context, t testTask) error {
+		// Hold so we can test that the tasks were claimed.
+		<-hold
+		return nil
+	}))
+
+	for i := 0; i < 5; i++ {
+		tk := &task.Task{
+			ID:        fmt.Sprint(i + 1),
+			Queue:     "test",
+			Task:      testutil.Encode(t, &testTask{Val: "1"}),
+			Attempts:  0,
+			CreatedAt: now(),
+		}
+		testutil.InsertTask(t, d.client.db, tk)
+	}
+
+	d.fetch()
+
+	// Check that the tasks were claimed.
+	rows, err := d.client.db.Query("SELECT id, claimed_at FROM backlite_tasks")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var rowCount int
+	for rows.Next() {
+		rowCount++
+		var id string
+		var claimedAt *int64
+
+		if err := rows.Scan(&id, &claimedAt); err != nil {
+			t.Fatal(err)
+		}
+
+		switch id {
+		case "1", "2", "3":
+			if claimedAt == nil {
+				t.Error("task should have been claimed")
+			}
+		default:
+			if claimedAt != nil {
+				t.Error("task should not have been claimed")
+			}
+		}
+	}
+	testutil.Equal(t, "rows", 5, rowCount)
+
+	// Release the processing.
+	for i := 0; i < d.numWorkers; i++ {
+		hold <- struct{}{}
+	}
+
+	// Wait for the workers to finish.
+	for i := 0; i < d.numWorkers; i++ {
+		<-d.availableWorkers
+	}
+
+	// The amount of tasks completed should match the amount of workers.
+	testutil.TaskIDsExist(t, d.client.db, []string{"4", "5"})
+	testutil.CompleteTaskIDsExist(t, d.client.db, []string{"1", "2", "3"})
+
+	// Verify that the attempt count was incremented.
+	for _, tk := range testutil.GetCompletedTasks(t, d.client.db) {
+		testutil.Equal(t, "attempts", 1, tk.Attempts)
+	}
+
+	// The ready signal should be sent because the next up task is ready.
+	testutil.WaitForChan(t, d.ready)
+
+	// Delete the tasks and add one that is scheduled to test the timer.
+	testutil.DeleteTasks(t, d.client.db)
+	testutil.InsertTask(t, d.client.db, &task.Task{
+		ID:        "6",
+		Queue:     "test",
+		Task:      testutil.Encode(t, &testTask{Val: "1"}),
+		Attempts:  0,
+		CreatedAt: now(),
+		WaitUntil: testutil.Pointer(now().Add(100 * time.Millisecond)),
+	})
+	hold <- struct{}{}
+	d.availableWorkers <- struct{}{}
+	d.fetch()
+
+	select {
+	case <-d.ticker.C:
+	case <-time.After(250 * time.Millisecond):
+		t.Error("ticker was not reset")
 	}
 }
 

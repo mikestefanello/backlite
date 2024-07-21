@@ -3,7 +3,6 @@ package task
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"time"
 
 	"github.com/mikestefanello/backlite/internal/query"
@@ -31,7 +30,6 @@ func (t Tasks) Claim(ctx context.Context, db *sql.DB) error {
 		params...,
 	)
 
-	slog.Info("claimed tasks", "len", len(t)) // TODO remove
 	return err
 }
 

@@ -328,7 +328,7 @@ func (d *dispatcher) schedule(t *task.Task) {
 			return
 		}
 
-		dur := time.Until(*t.WaitUntil)
+		dur := t.WaitUntil.Sub(now())
 		if dur < 0 {
 			d.ready <- struct{}{}
 			return
@@ -505,7 +505,6 @@ func (d *dispatcher) taskFailure(q Queue, t *task.Task, started time.Time, dur t
 			)
 		}
 
-		// TODO schedule or just poll?
 		d.ready <- struct{}{}
 	}
 }
