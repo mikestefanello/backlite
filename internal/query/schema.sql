@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS backlite_tasks (
-    id text primary key,
+    id text PRIMARY KEY,
     created_at integer NOT NULL,
     queue text NOT NULL,
     task blob NOT NULL,
@@ -10,11 +10,11 @@ CREATE TABLE IF NOT EXISTS backlite_tasks (
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS backlite_tasks_completed (
-    id text primary key NOT NULL,
+    id text PRIMARY KEY NOT NULL,
     created_at integer NOT NULL,
     queue text NOT NULL,
     last_executed_at integer,
-    attempts integer not null,
+    attempts integer NOT NULL,
     last_duration_micro integer,
     succeeded integer,
     task blob,
@@ -22,5 +22,4 @@ CREATE TABLE IF NOT EXISTS backlite_tasks_completed (
     error text
 ) STRICT;
 
--- Do we need indexes?
--- CREATE INDEX IF NOT EXISTS backlite_tasks_created_at on backlite_tasks (created_at);
+CREATE INDEX IF NOT EXISTS backlite_tasks_wait_until ON backlite_tasks (wait_until) WHERE wait_until IS NOT NULL;

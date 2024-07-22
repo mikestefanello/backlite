@@ -13,6 +13,7 @@
     * [Overview](#overview)
     * [Origin](#origin)
     * [Screenshots](#screenshots)
+    * [Status](#status)
 * [Installation](#installation)
 * [Features](#features)
     * [Type-safety](#type-safety) 
@@ -32,6 +33,7 @@
     * [Web UI](#web-ui)
 * [Usage](#usage)
     * [Client initialization](#client-initialization)
+    * [Schema installation](#schema-installation)
     * [Declaring a Task type](#declaring-a-task-type)
     * [Queue processor](#queue-processor)
     * [Registering a queue](#registering-a-queue)
@@ -55,6 +57,10 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 ### Screenshots
 
 Coming soon.
+
+### Status
+
+This project is under active development and is not yet recommended for production use.
 
 ## Installation
 
@@ -96,7 +102,7 @@ While processing a given task, it's easy to create another task in the same or a
 
 ### Graceful shutdown
 
-The task dispatcher, which handles sending tasks to the worker pool for execution, can be shut-down gracefully by calling `Stop()` on the client. That will wait for all workers to finish for as long as the passed in context is not cancelled. The hard-stop the dispatcher, cancel the context passed in when calling `Start()`. See usage below.
+The task dispatcher, which handles sending tasks to the worker pool for execution, can be shutdown gracefully by calling `Stop()` on the client. That will wait for all workers to finish for as long as the passed in context is not cancelled. The hard-stop the dispatcher, cancel the context passed in when calling `Start()`. See usage below.
 
 ### Transactions
 
@@ -108,7 +114,7 @@ Since SQLite only supports one writer, no continuous database polling is require
 
 ### Driver flexibility
 
-Use any SQLite driver that you'd like. This library only include [go-sqlite3](https://github.com/mattn/go-sqlite3) since it is used in tests.
+Use any SQLite driver that you'd like. This library only includes [go-sqlite3](https://github.com/mattn/go-sqlite3) since it is used in tests.
 
 ### Bulk inserts
 
@@ -157,6 +163,10 @@ The configuration options are:
 * **NumWorkers**: The amount of goroutines to open which will process queued tasks.
 * **CleanupInterval**: How often the completed tasks database table will attempt to remove expired rows.
 
+### Schema installation
+
+Until a more robust system is provided, to install the database schema, call `client.Install()`. This must be done prior to using the client. It is safe to call this if the schema was previously installed. The schema is currently defined in `internal/query/schema.sql`.
+
 ### Declaring a Task type
 
 Any type can be a task as long as it implements the `Task` interface, which requires only the `Config() QueueConfig` method, used to provide information about the queue that these tasks will be added to. As an example, this is a task used to send new order email notifications:
@@ -173,17 +183,17 @@ Then implement the `Task` interface by providing the queue configuration:
 ```go
 func (t NewOrderEmailTask) Config() backlite.QueueConfig {
     return backlite.QueueConfig{
-		Name:        "NewOrderEmail",
-		MaxAttempts: 5,
-		Backoff:     5 * time.Second,
-		Timeout:     10 * time.Second,
-		Retention: &backlite.Retention{
-			Duration:   6 * time.Hour,
-			OnlyFailed: false,
-			Data: &backlite.RetainData{
-				OnlyFailed: true,
-			},
-		},
+        Name:        "NewOrderEmail",
+        MaxAttempts: 5,
+        Backoff:     5 * time.Second,
+        Timeout:     10 * time.Second,
+        Retention: &backlite.Retention{
+            Duration:   6 * time.Hour,
+            OnlyFailed: false,
+            Data: &backlite.RetainData{
+                OnlyFailed: true,
+            },
+        },
     }
 }
 ```
@@ -246,7 +256,7 @@ To start the dispatcher, which will spin up the worker pool and begin executing 
 
 To gracefully shutdown the dispatcher, which will wait until all tasks currently being executed are finished, call `client.Stop()`. You can provide a context with a given timeout in order to give the shutdown process a set amount of time to gracefully shutdown. For example:
 
-```
+```go
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 defer cancel()
 client.Stop(ctx)
@@ -267,3 +277,4 @@ If you want to hard-stop the dispatcher, cancel the context that was provided wh
 - Store queue stats in a separate table?
 - Pause/resume queues
 - Benchmarks
+- Expand testing
