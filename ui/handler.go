@@ -9,15 +9,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/mikestefanello/backlite"
-
 	"github.com/mikestefanello/backlite/internal/task"
 )
 
 type (
 	Handler struct {
-		db  *sql.DB
-		cli backlite.Client
+		db *sql.DB
 	}
 
 	TemplateData struct {
@@ -37,68 +34,68 @@ func NewHandler(db *sql.DB) *http.ServeMux {
 }
 
 func (h *Handler) Running(w http.ResponseWriter, req *http.Request) {
-	if err := h.running(w, req); err != nil {
+	err := func() error {
+		tasks, err := task.GetTasks(req.Context(), h.db, selectRunningTasks, itemLimit)
+		if err != nil {
+			return err
+		}
+
+		return h.render(req, w, tmplTasks, tasks)
+	}()
+
+	if err != nil {
 		h.error(w, err)
 	}
 }
 
 func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) {
-	if err := h.upcoming(w, req); err != nil {
+	err := func() error {
+		// TODO use actual time from the client
+		tasks, err := task.GetScheduledTasks(req.Context(), h.db, time.Now().Add(time.Hour), itemLimit)
+		if err != nil {
+			return err
+		}
+
+		return h.render(req, w, tmplTasks, tasks)
+	}()
+
+	if err != nil {
 		h.error(w, err)
 	}
 }
 
 func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) {
-	if err := h.succeeded(w, req); err != nil {
+	err := func() error {
+		tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 1, itemLimit)
+		if err != nil {
+			return err
+		}
+
+		return h.render(req, w, tmplCompletedTasks, tasks)
+	}()
+
+	if err != nil {
 		h.error(w, err)
 	}
 }
 
 func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) {
-	if err := h.failed(w, req); err != nil {
+	err := func() error {
+		tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 0, itemLimit)
+		if err != nil {
+			return err
+		}
+
+		return h.render(req, w, tmplCompletedTasks, tasks)
+	}()
+
+	if err != nil {
 		h.error(w, err)
 	}
 }
 
-func (h *Handler) running(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetTasks(req.Context(), h.db, selectRunningTasks, itemLimit)
-	if err != nil {
-		return err
-	}
-
-	return h.render(req, w, tmplTasks, tasks)
-}
-
-func (h *Handler) upcoming(w http.ResponseWriter, req *http.Request) error {
-	// TODO use actual time from the client
-	tasks, err := task.GetScheduledTasks(req.Context(), h.db, time.Now().Add(time.Hour), itemLimit)
-	if err != nil {
-		return err
-	}
-
-	return h.render(req, w, tmplTasks, tasks)
-}
-
-func (h *Handler) succeeded(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 1, itemLimit)
-	if err != nil {
-		return err
-	}
-
-	return h.render(req, w, tmplCompletedTasks, tasks)
-}
-
-func (h *Handler) failed(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 0, itemLimit)
-	if err != nil {
-		return err
-	}
-
-	return h.render(req, w, tmplCompletedTasks, tasks)
-}
-
 func (h *Handler) error(w http.ResponseWriter, err error) {
-	fmt.Fprintf(w, err.Error())
+	fmt.Fprint(w, err)
 	log.Println(err)
 	w.WriteHeader(http.StatusInternalServerError)
 }

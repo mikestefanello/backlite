@@ -54,7 +54,9 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 
 ### Screenshots
 
-Coming soon.
+<img src="https://github.com/user-attachments/assets/1ec7b182-2bd0-4f21-84ed-a351c30d7881" alt="Inline validation"/>
+
+More to come as the web UI is under active development.
 
 ### Status
 
@@ -128,7 +130,17 @@ When creating a client, you can specify the amount of goroutines to use to build
 
 ### Web UI
 
-A simple web UI to monitor running, upcoming, and completed tasks is provided but under active development.
+A simple web UI to monitor running, upcoming, and completed tasks is provided but **under active development**.
+
+To run, pass your `*sql.DB` to `ui.NewHandler()` and provide that to an HTTP server, for example:
+
+```go
+err := http.ListenAndServe(":9000", ui.NewHandler(db))
+```
+
+Then visit, `/backlite` in your browser, using the given port and/or domain.
+
+The web CSS and JS are provided by [tabler](https://github.com/tabler/tabler).
 
 ## Usage
 

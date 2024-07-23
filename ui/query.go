@@ -2,6 +2,8 @@ package ui
 
 const itemLimit = 25
 
+// TODO no need to select task field for lists, need claimed_at for running tasks
+
 const selectRunningTasks = `
 	SELECT 
 	    id, queue, task, attempts, wait_until, created_at
