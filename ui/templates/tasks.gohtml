@@ -1,0 +1,40 @@
+{{define "content"}}
+    <div class="row">
+        <div class="col-12 col-md-6 col-lg">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Queue</th>
+                                <th>Attempts</th>
+                                <th>Created at</th>
+                                <th>Last executed at</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .}}
+                                <tr>
+                                    <td>{{.Queue}}</td>
+                                    <td class="text-secondary">{{.Attempts}}</td>
+                                    <td class="text-secondary">{{.CreatedAt}}</td>
+                                    <td class="text-secondary">
+                                        {{if .LastExecutedAt}}
+                                            {{.LastExecutedAt}}
+                                        {{else}}
+                                            Never
+                                        {{end}}
+                                    </td>
+                                    <td>
+                                        <a href="">View</a>
+                                    </td>
+                                </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{{end}}
