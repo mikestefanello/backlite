@@ -6,8 +6,6 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mikestefanello/backlite.svg)](https://pkg.go.dev/github.com/mikestefanello/backlite)
 [![GoT](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](https://go.dev)
 
-<p align="center"><img alt="Logo" src="todo" height="200px"/></p>
-
 ## Table of Contents
 * [Introduction](#introduction)
     * [Overview](#overview)
@@ -214,9 +212,11 @@ The configuration options are:
 The easiest way to implement a queue and define the processor is to use `backlite.NewQueue()`. This leverages generics in order to provide type-safety with a given task type. Using the example above:
 
 ```go
-queue := NewQueue[NewOrderEmailTask](func(ctx context.Context, task NewOrderEmailTask) error {
+processor := func(ctx context.Context, task NewOrderEmailTask) error {
     return email.Send(ctx, task.EmailAddress, fmt.Sprintf("Order %s received", task.OrderID))
-})
+}
+
+queue := backlite.NewQueue[NewOrderEmailTask](processor)
 ```
 
 The parameter is the processor callback which is what will be called by the dispatcher worker pool to execute the task. If no error is returned, the task is considered successfully executed. If the task fails all attempts and the queue has rention enabled, the value of the error will be stored in the database.

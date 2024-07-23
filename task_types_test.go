@@ -105,3 +105,13 @@ func (t testTaskRetainDataFailed) Config() QueueConfig {
 		},
 	}
 }
+
+type testTaskNoName struct {
+	Val string
+}
+
+func (t testTaskNoName) Config() QueueConfig {
+	return QueueConfig{
+		Name: "",
+	}
+}

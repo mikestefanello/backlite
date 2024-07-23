@@ -162,12 +162,12 @@ func (d *dispatcher) triggerer() {
 // fetcher fetches tasks from the database to be executed either when the ticker ticks or when the trigger signal
 // is sent by the triggerer.
 func (d *dispatcher) fetcher() {
-	end := func() {
+	defer func() {
 		d.running.Store(false)
 		d.ticker.Stop()
 		close(d.tasks)
 		d.log.Info("shutting down dispatcher")
-	}
+	}()
 
 	for {
 		select {
@@ -179,11 +179,9 @@ func (d *dispatcher) fetcher() {
 			d.fetch()
 
 		case <-d.shutdownCtx.Done():
-			end()
 			return
 
 		case <-d.ctx.Done():
-			end()
 			return
 		}
 	}
@@ -232,9 +230,9 @@ func (d *dispatcher) cleaner() {
 	}
 }
 
-// acquireWorkers waits until at least one worker is available to execute a task and returns the number that are
+// waitForWorkers waits until at least one worker is available to execute a task and returns the number that are
 // available.
-func (d *dispatcher) acquireWorkers() int {
+func (d *dispatcher) waitForWorkers() int {
 	for {
 		if w := len(d.availableWorkers); w > 0 {
 			return w
@@ -261,7 +259,7 @@ func (d *dispatcher) fetch() {
 	d.triggered.Store(false)
 
 	// Determine how many workers are available, so we only fetch that many tasks.
-	workers := d.acquireWorkers()
+	workers := d.waitForWorkers()
 
 	// Fetch tasks for each available worker plus the next upcoming task so the scheduler knows when to
 	// query the database again without having to continually poll.

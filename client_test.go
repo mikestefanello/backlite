@@ -142,6 +142,23 @@ func TestClient_Register(t *testing.T) {
 	if !panicked {
 		t.Error("expected panic")
 	}
+
+	q = NewQueue[testTaskNoName](func(_ context.Context, _ testTaskNoName) error {
+		return nil
+	})
+	panicked = false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		c.Register(q)
+	}()
+
+	if !panicked {
+		t.Error("expected panic")
+	}
 }
 
 func TestClient_Install(t *testing.T) {

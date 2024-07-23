@@ -107,6 +107,10 @@ func (q *queue[T]) Receive(ctx context.Context, payload []byte) error {
 
 // add adds a queue to the registry and will panic if the name has already been registered.
 func (q *queues) add(queue Queue) {
+	if len(queue.Config().Name) == 0 {
+		panic("queue name is missing")
+	}
+
 	q.Lock()
 	defer q.Unlock()
 
