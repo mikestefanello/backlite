@@ -380,7 +380,7 @@ func (d *dispatcher) processTask(t *task.Task) {
 	}()
 
 	// Process the task.
-	if err = q.Receive(ctx, t.Task); err == nil {
+	if err = q.Process(ctx, t.Task); err == nil {
 		d.taskSuccess(q, t, start, time.Since(start))
 	}
 }

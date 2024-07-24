@@ -60,7 +60,7 @@ More to come as the web UI is under active development.
 
 ### Status
 
-This project is under active development and is not yet recommended for production use.
+This project is under active development and is not yet recommended for production use though all features outlined below are available.
 
 ## Installation
 
@@ -70,7 +70,7 @@ Install by simply running: `go get github.com/mikestefanello/backlite`
 
 ### Type-safety
 
-No need to deal with serialization and byte slices. By leveraging generics, tasks and queues are completely type-safe which means that you pass in your task type in to a queue and your task processor callbacks will only receive that given type.
+No need to deal with serialization and byte slices. By leveraging generics, tasks and queues are completely type-safe which means that you pass in your task type into a queue and your task processor callbacks will only receive that given type.
  
 ### Persistence with SQLite
 
@@ -106,7 +106,7 @@ The task dispatcher, which handles sending tasks to the worker pool for executio
 
 ### Transactions
 
-Task creation can be added to a given database transaction. If you are using SQLite as your primary database, this provides a simple, robust way to ensure data integrity. For example, using the eCommerce app example, when inserting a new order in to your database, the same transaction to be used to add a task to send an order notification email, and they either both succeed or both fail. Use the chained method `Tx()` to provide your transaction when adding one or multiple tasks.
+Task creation can be added to a given database transaction. If you are using SQLite as your primary database, this provides a simple, robust way to ensure data integrity. For example, using the eCommerce app example, when inserting a new order into your database, the same transaction to be used to add a task to send an order notification email, and they either both succeed or both fail. Use the chained method `Tx()` to provide your transaction when adding one or multiple tasks.
 
 ### No database polling
 
@@ -214,7 +214,7 @@ The configuration options are:
 * **MaxAttempts**: The maximum number of times to try executing this task before it's consider failed and marked as complete.
 * **Backoff**: The amount of time to wait before retrying after a failed attempt at processing.
 * **Retention**: If provided, completed tasks will be retained in the database in a separate table according to the included options.
-    * **Duration**: How long to retain completed tasks in the database for.
+    * **Duration**: How long to retain completed tasks in the database for. Omit to never expire.
     * **OnlyFailed**: If true, only failed tasks will be retained.
     * **Data**: If provided, the task data (the serialized task itself) will be retained.
         * **OnlyFailed**: If true, the task data will only be retained for failed tasks.
@@ -231,7 +231,7 @@ processor := func(ctx context.Context, task NewOrderEmailTask) error {
 queue := backlite.NewQueue[NewOrderEmailTask](processor)
 ```
 
-The parameter is the processor callback which is what will be called by the dispatcher worker pool to execute the task. If no error is returned, the task is considered successfully executed. If the task fails all attempts and the queue has rention enabled, the value of the error will be stored in the database.
+The parameter is the processor callback which is what will be called by the dispatcher worker pool to execute the task. If no error is returned, the task is considered successfully executed. If the task fails all attempts and the queue has retention enabled, the value of the error will be stored in the database.
 
 The provided context will be set to timeout at the duration set in the queue settings, if provided. To get the client from the context, you can call `client := backlite.FromContext(ctx)`.
 
@@ -241,7 +241,7 @@ You must register all queues with the client by calling `client.Register(queue)`
 
 ### Adding tasks
 
-To add a task to the queue, simply pass one or many in to `client.Add()`. You can provide tasks of different types. This returns a chainable operation which contains many options, that can be used as follows:
+To add a task to the queue, simply pass one or many into `client.Add()`. You can provide tasks of different types. This returns a chainable operation which contains many options, that can be used as follows:
 
 ```go
 err := client.
@@ -253,7 +253,9 @@ err := client.
     Save()
 ```
 
-Only `Add()` and `Save()` are required. The following options are:
+Only `Add()` and `Save()` are required. Don't use `At()` and `Wait()` together as they override each other.
+
+The options are:
 
 * **Ctx**: Provide a context to use for the operation.
 * **Tx**: Provide a database transaction to add the tasks to. You must commit this yourself then call `client.Notify()` to tell the dispatcher that the new task(s) were added. This may be improved in the future but for now it is required.

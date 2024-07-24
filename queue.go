@@ -15,8 +15,8 @@ type (
 		// Config returns the configuration for the queue.
 		Config() *QueueConfig
 
-		// Receive receives the Task payload to be processed.
-		Receive(ctx context.Context, payload []byte) error
+		// Process processes the Task.
+		Process(ctx context.Context, payload []byte) error
 	}
 
 	// QueueConfig is the configuration options for a queue.
@@ -91,7 +91,7 @@ func (q *queue[T]) Config() *QueueConfig {
 	return q.config
 }
 
-func (q *queue[T]) Receive(ctx context.Context, payload []byte) error {
+func (q *queue[T]) Process(ctx context.Context, payload []byte) error {
 	var obj T
 
 	err := json.

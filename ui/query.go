@@ -6,7 +6,12 @@ const itemLimit = 25
 
 const selectRunningTasks = `
 	SELECT 
-	    id, queue, task, attempts, wait_until, created_at
+	    id,
+	    queue,
+	    null,
+	    attempts,
+	    wait_until,
+	    created_at
 	FROM 
 	    backlite_tasks
 	WHERE
@@ -14,7 +19,17 @@ const selectRunningTasks = `
 	LIMIT ?
 `
 const selectCompletedTasks = `
-	SELECT *
+	SELECT
+	    id,
+		created_at,
+		queue text,
+		last_executed_at,
+		attempts,
+		last_duration_micro,
+		succeeded,
+		null,
+		expires_at,
+		error
 	FROM
 	    backlite_tasks_completed 
 	WHERE
