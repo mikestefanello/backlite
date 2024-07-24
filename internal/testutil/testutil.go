@@ -19,7 +19,7 @@ import (
 func GetTasks(t *testing.T, db *sql.DB) task.Tasks {
 	got, err := task.GetTasks(context.Background(), db, `
 		SELECT 
-			id, queue, task, attempts, wait_until, created_at, last_executed_at
+			id, queue, task, attempts, wait_until, created_at, last_executed_at, claimed_at
 		FROM 
 			backlite_tasks
 		ORDER BY

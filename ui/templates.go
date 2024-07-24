@@ -10,8 +10,9 @@ import (
 var templates embed.FS
 
 var (
-	tmplTasks          = mustParse("tasks")
-	tmplCompletedTasks = mustParse("completed_tasks")
+	tmplTasksRunning   = mustParse("running")
+	tmplTasksUpcoming  = mustParse("upcoming")
+	tmplTasksCompleted = mustParse("completed_tasks")
 )
 
 func mustParse(page string) *template.Template {

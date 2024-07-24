@@ -32,6 +32,9 @@ type Task struct {
 
 	// LastExecutedAt is the last time this Task executed.
 	LastExecutedAt *time.Time
+
+	// ClaimedAt is the time this Task was claimed for execution.
+	ClaimedAt *time.Time
 }
 
 // InsertTx inserts a task as part of a database transaction.

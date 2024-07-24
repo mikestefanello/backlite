@@ -40,7 +40,7 @@ func (h *Handler) Running(w http.ResponseWriter, req *http.Request) {
 			return err
 		}
 
-		return h.render(req, w, tmplTasks, tasks)
+		return h.render(req, w, tmplTasksRunning, tasks)
 	}()
 
 	if err != nil {
@@ -56,7 +56,7 @@ func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) {
 			return err
 		}
 
-		return h.render(req, w, tmplTasks, tasks)
+		return h.render(req, w, tmplTasksUpcoming, tasks)
 	}()
 
 	if err != nil {
@@ -71,7 +71,7 @@ func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) {
 			return err
 		}
 
-		return h.render(req, w, tmplCompletedTasks, tasks)
+		return h.render(req, w, tmplTasksCompleted, tasks)
 	}()
 
 	if err != nil {
@@ -86,7 +86,7 @@ func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) {
 			return err
 		}
 
-		return h.render(req, w, tmplCompletedTasks, tasks)
+		return h.render(req, w, tmplTasksCompleted, tasks)
 	}()
 
 	if err != nil {

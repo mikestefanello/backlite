@@ -6,6 +6,7 @@
                     <table class="table table-vcenter card-table">
                         <thead>
                             <tr>
+                                <th class="w-1"></th>
                                 <th>Queue</th>
                                 <th>Attempts</th>
                                 <th>Created at</th>
@@ -16,6 +17,7 @@
                         <tbody>
                             {{range .}}
                                 <tr>
+                                    <td><span class="status-dot status-azure"></span></td>
                                     <td>{{.Queue}}</td>
                                     <td class="text-secondary">{{.Attempts}}</td>
                                     <td class="text-secondary">{{.CreatedAt}}</td>
@@ -27,7 +29,7 @@
                                         {{end}}
                                     </td>
                                     <td>
-                                        <a href="">View</a>
+                                        <a href="/task/{{.ID}}">View</a>
                                     </td>
                                 </tr>
                             {{end}}

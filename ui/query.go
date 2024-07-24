@@ -11,7 +11,9 @@ const selectRunningTasks = `
 	    null,
 	    attempts,
 	    wait_until,
-	    created_at
+	    created_at,
+	    last_executed_at,
+	    claimed_at
 	FROM 
 	    backlite_tasks
 	WHERE
