@@ -6,6 +6,8 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mikestefanello/backlite.svg)](https://pkg.go.dev/github.com/mikestefanello/backlite)
 [![GoT](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](https://go.dev)
 
+<p align="center"><img alt="Logo" src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite-logo.png" height="200px"/></p>
+
 ## Table of Contents
 * [Introduction](#introduction)
     * [Overview](#overview)
@@ -54,7 +56,7 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 
 ### Screenshots
 
-<img src="https://github.com/user-attachments/assets/1ec7b182-2bd0-4f21-84ed-a351c30d7881" alt="Inline validation"/>
+<img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite-ui-failed.png" alt="Inline validation"/>
 
 More to come as the web UI is under active development.
 
@@ -138,12 +140,11 @@ To run, pass your `*sql.DB` to `ui.NewHandler()` and provide that to an HTTP ser
 err := http.ListenAndServe(":9000", ui.NewHandler(db))
 ```
 
-Then visit, `/backlite` in your browser, using the given port and/or domain.
+Then visit the given port and/or domain in your browser (ie, `localhost:9000`).
 
 The web CSS and JS are provided by [tabler](https://github.com/tabler/tabler).
 
 ## Usage
-
 
 ### Client initialization
 
