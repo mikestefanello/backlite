@@ -6,7 +6,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mikestefanello/backlite.svg)](https://pkg.go.dev/github.com/mikestefanello/backlite)
 [![GoT](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](https://go.dev)
 
-<p align="center"><img alt="Logo" src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite-logo.png" height="200px"/></p>
+<p align="center"><img alt="Logo" src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite-logo.png" height="100px"/></p>
 
 ## Table of Contents
 * [Introduction](#introduction)
