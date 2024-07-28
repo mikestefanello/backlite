@@ -4,6 +4,22 @@ const itemLimit = 25
 
 // TODO no need to select task field for lists, need claimed_at for running tasks
 
+const selectTask = `
+	SELECT 
+	    id,
+	    queue,
+	    task,
+	    attempts,
+	    wait_until,
+	    created_at,
+	    last_executed_at,
+	    claimed_at
+	FROM 
+	    backlite_tasks
+	WHERE
+	    id = ?
+`
+
 const selectRunningTasks = `
 	SELECT 
 	    id,

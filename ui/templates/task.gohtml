@@ -1,0 +1,85 @@
+{{define "content"}}
+    <div class="row">
+        <div class="col-12 col-md-6 col-lg">
+            <div class="card">
+                {{if .}}
+                    <div class="card-header">
+                        <h3 class="card-title">Task</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Status</div>
+                                <div class="datagrid-content">
+                                    {{if .ClaimedAt}}
+                                        <span class="status status-yellow">
+                                          <span class="status-dot status-dot-animated"></span>
+                                          Running
+                                        </span>
+                                    {{else}}
+                                        <span class="status status-azure status-lite">
+                                          <span class="status-dot"></span>
+                                          Upcoming
+                                        </span>
+                                    {{end}}
+                                </div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Queue</div>
+                                <div class="datagrid-content">{{.Queue}}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">ID</div>
+                                <div class="datagrid-content">{{.ID}}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Created at</div>
+                                <div class="datagrid-content">{{.CreatedAt}}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Started</div>
+                                {{if .ClaimedAt}}
+                                    {{.ClaimedAt}}
+                                {{else}}
+                                    -
+                                {{end}}
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Wait until</div>
+                                {{if .WaitUntil}}
+                                    {{.WaitUntil}}
+                                {{else}}
+                                    -
+                                {{end}}
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Attempts</div>
+                                <div class="datagrid-content">
+                                    {{.Attempts}}
+                                </div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Last executed at</div>
+                                {{if .LastExecutedAt}}
+                                    {{.LastExecutedAt}}
+                                {{else}}
+                                    -
+                                {{end}}
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">Data</div>
+                                <div class="datagrid-content">
+                                    <kbd>{{bytestring .Task}}</kbd>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {{else}}
+                    <div class="card-header">
+                        <h3 class="card-title">Task not found!</h3>
+                    </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+{{end}}
