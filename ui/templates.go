@@ -14,6 +14,7 @@ var (
 	tmplTasksUpcoming  = mustParse("upcoming")
 	tmplTasksCompleted = mustParse("completed_tasks")
 	tmplTask           = mustParse("task")
+	tmplTaskCompleted  = mustParse("completed_task")
 )
 
 func mustParse(page string) *template.Template {

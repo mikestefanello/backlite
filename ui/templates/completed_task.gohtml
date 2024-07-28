@@ -4,22 +4,22 @@
             <div class="card">
                 {{if .}}
                     <div class="card-header">
-                        <h3 class="card-title">Task</h3>
+                        <h3 class="card-title">Completed task</h3>
                     </div>
                     <div class="card-body">
                         <div class="datagrid">
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
-                                    {{if .ClaimedAt}}
-                                        <span class="status status-yellow">
-                                          <span class="status-dot status-dot-animated"></span>
-                                          Running
+                                    {{if .Succeeded}}
+                                        <span class="status status-green status-lite">
+                                          <span class="status-dot"></span>
+                                          Succeeded
                                         </span>
                                     {{else}}
-                                        <span class="status status-azure status-lite">
+                                        <span class="status status-red status-lite">
                                           <span class="status-dot"></span>
-                                          Upcoming
+                                          Failed
                                         </span>
                                     {{end}}
                                 </div>
@@ -37,45 +37,51 @@
                                 <div class="datagrid-content">{{.CreatedAt}}</div>
                             </div>
                             <div class="datagrid-item">
-                                <div class="datagrid-title">Started</div>
-                                <div class="datagrid-content">
-                                    {{if .ClaimedAt}}
-                                        {{.ClaimedAt}}
-                                    {{else}}
-                                        -
-                                    {{end}}
-                                </div>
+                                <div class="datagrid-title">Last executed at</div>
+                                <div class="datagrid-content">{{.LastExecutedAt}}</div>
                             </div>
                             <div class="datagrid-item">
-                                <div class="datagrid-title">Wait until</div>
-                                <div class="datagrid-content">
-                                    {{if .WaitUntil}}
-                                        {{.WaitUntil}}
-                                    {{else}}
-                                        -
-                                    {{end}}
-                                </div>
+                                <div class="datagrid-title">Last duration</div>
+                                <div class="datagrid-content">{{.LastDuration}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Attempts</div>
-                                <div class="datagrid-content">
-                                    {{.Attempts}}
-                                </div>
+                                <div class="datagrid-content">{{.Attempts}}</div>
                             </div>
                             <div class="datagrid-item">
-                                <div class="datagrid-title">Last executed at</div>
+                                <div class="datagrid-title">Expires at</div>
                                 <div class="datagrid-content">
-                                    {{if .LastExecutedAt}}
-                                        {{.LastExecutedAt}}
+                                    {{if .ExpiresAt}}
+                                        {{.ExpiresAt}}
                                     {{else}}
-                                        -
+                                        Never
                                     {{end}}
                                 </div>
                             </div>
+                        </div>
+                        {{if .Error}}
+                            <br />
+                            <div class="datagrid">
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">Error</div>
+                                    <div class="datagrid-content">
+                                        <div class="alert alert-important alert-danger" role="alert">
+                                            {{.Error}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {{end}}
+                        <br />
+                        <div class="datagrid">
                             <div class="datagrid-item">
-                                <div class="datagrid-title">Data</div>
+                                <div class="datagrid-title">Task</div>
                                 <div class="datagrid-content">
-                                    <kbd>{{bytestring .Task}}</kbd>
+                                    {{if .Task}}
+                                        <kbd>{{bytestring .Task}}</kbd>
+                                    {{else}}
+                                        Not retained
+                                    {{end}}
                                 </div>
                             </div>
                         </div>

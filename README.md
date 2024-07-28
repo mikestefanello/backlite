@@ -60,6 +60,8 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 
 <img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite/task.png" alt="Task details"/>
 
+<img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite/task-failed.png" alt="Task failed"/>
+
 More to come as the web UI is under active development.
 
 ### Status

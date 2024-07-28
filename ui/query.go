@@ -20,6 +20,24 @@ const selectTask = `
 	    id = ?
 `
 
+const selectCompletedTask = `
+	SELECT
+	    id,
+		created_at,
+		queue text,
+		last_executed_at,
+		attempts,
+		last_duration_micro,
+		succeeded,
+		task,
+		expires_at,
+		error
+	FROM
+	    backlite_tasks_completed 
+	WHERE
+	    id = ?
+`
+
 const selectRunningTasks = `
 	SELECT 
 	    id,

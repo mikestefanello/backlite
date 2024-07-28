@@ -31,6 +31,7 @@ func NewHandler(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("GET /succeeded", h.Succeeded)
 	mux.HandleFunc("GET /failed", h.Failed)
 	mux.HandleFunc("GET /task/{task}", h.Task)
+	mux.HandleFunc("GET /completed/{task}", h.TaskCompleted)
 	return mux
 }
 
@@ -109,6 +110,27 @@ func (h *Handler) Task(w http.ResponseWriter, req *http.Request) {
 		}
 
 		return h.render(req, w, tmplTask, t)
+	}()
+
+	if err != nil {
+		h.error(w, err)
+	}
+}
+
+func (h *Handler) TaskCompleted(w http.ResponseWriter, req *http.Request) {
+	err := func() error {
+		var t *task.Completed
+		id := req.PathValue("task")
+		tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTask, id)
+		if err != nil {
+			return err
+		}
+
+		if len(tasks) > 0 {
+			t = tasks[0]
+		}
+
+		return h.render(req, w, tmplTaskCompleted, t)
 	}()
 
 	if err != nil {
