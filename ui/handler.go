@@ -97,8 +97,9 @@ func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) Task(w http.ResponseWriter, req *http.Request) {
+	var t *task.Task
+
 	err := func() error {
-		var t *task.Task
 		id := req.PathValue("task")
 		tasks, err := task.GetTasks(req.Context(), h.db, selectTask, id)
 		if err != nil {
@@ -107,13 +108,17 @@ func (h *Handler) Task(w http.ResponseWriter, req *http.Request) {
 
 		if len(tasks) > 0 {
 			t = tasks[0]
+			return h.render(req, w, tmplTask, t)
 		}
 
-		return h.render(req, w, tmplTask, t)
+		return nil
 	}()
 
 	if err != nil {
 		h.error(w, err)
+	} else if t == nil {
+		// If no task found, try the same ID as a completed task.
+		h.TaskCompleted(w, req)
 	}
 }
 
