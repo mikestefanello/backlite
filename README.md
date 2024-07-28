@@ -56,7 +56,9 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 
 ### Screenshots
 
-<img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite-ui-failed.png" alt="Inline validation"/>
+<img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite/failed.png" alt="Failed tasks"/>
+
+<img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite/task.png" alt="Task details"/>
 
 More to come as the web UI is under active development.
 
