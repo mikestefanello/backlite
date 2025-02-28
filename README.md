@@ -66,7 +66,7 @@ More to come as the web UI is under active development.
 
 ### Status
 
-This project is under active development and is not yet recommended for production use though all features outlined below are available.
+This project is under active development though all features outlined below are available and complete. No significant API or schema changes are expected at this time.
 
 ## Installation
 
