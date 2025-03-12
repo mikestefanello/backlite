@@ -136,12 +136,14 @@ When creating a client, you can specify the amount of goroutines to use to build
 
 ### Web UI
 
-A simple web UI to monitor running, upcoming, and completed tasks is provided but **under active development**.
+A simple web UI to monitor running, upcoming, and completed tasks is provided.
 
-To run, pass your `*sql.DB` to `ui.NewHandler()` and provide that to an HTTP server, for example:
+To run, pass your `*sql.DB` to `ui.NewHandler()` and register that to an HTTP handler, for example:
 
 ```go
-err := http.ListenAndServe(":9000", ui.NewHandler(db))
+mux := http.DefaultServeMux
+ui.NewHandler(db).Register(mux)
+err := http.ListenAndServe(":9000", mux)
 ```
 
 Then visit the given port and/or domain in your browser (ie, `localhost:9000`).
