@@ -77,7 +77,7 @@ type (
 // NewQueue creates a new type-safe Queue of a given Task type
 func NewQueue[T Task](processor QueueProcessor[T]) Queue {
 	var task T
-	cfg := task.Config() // TODO fix this?
+	cfg := task.Config()
 
 	q := &queue[T]{
 		config:    &cfg,

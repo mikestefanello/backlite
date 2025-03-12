@@ -12,12 +12,12 @@
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
                                     {{if .Succeeded}}
-                                        <span class="status status-green status-lite">
+                                        <span class="status status-green">
                                           <span class="status-dot"></span>
                                           Succeeded
                                         </span>
                                     {{else}}
-                                        <span class="status status-red status-lite">
+                                        <span class="status status-red">
                                           <span class="status-dot"></span>
                                           Failed
                                         </span>
@@ -75,7 +75,7 @@
                         <br />
                         <div class="datagrid">
                             <div class="datagrid-item">
-                                <div class="datagrid-title">Task</div>
+                                <div class="datagrid-title">Data</div>
                                 <div class="datagrid-content">
                                     {{if .Task}}
                                         <kbd>{{bytestring .Task}}</kbd>
