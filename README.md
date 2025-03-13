@@ -31,6 +31,7 @@
     * [Execution timeout](#execution-timeout)
     * [Background worker pool](#background-worker-pool)
     * [Web UI](#web-ui)
+    * [Panic recovery](#panic-recovery)
 * [Usage](#usage)
     * [Client initialization](#client-initialization)
     * [Schema installation](#schema-installation)
@@ -62,11 +63,9 @@ This project started shortly after migrating [Pagoda](https://github.com/mikeste
 
 <img src="https://raw.githubusercontent.com/mikestefanello/readmeimages/main/backlite/task-failed.png" alt="Task failed"/>
 
-More to come as the web UI is under active development.
-
 ### Status
 
-This project is under active development though all features outlined below are available and complete. No significant API or schema changes are expected at this time.
+This project is under active development, though all features outlined below are available and complete. No significant API or schema changes are expected at this time, but it is certainly possible.
 
 ## Installation
 
@@ -149,6 +148,10 @@ err := http.ListenAndServe(":9000", mux)
 Then visit the given port and/or domain in your browser (ie, `localhost:9000`).
 
 The web CSS and JS are provided by [tabler](https://github.com/tabler/tabler).
+
+### Panic recovery
+
+If any of your task processors panics, the application with automatically recover, mark the task as failed, and store the panic message as the error message.
 
 ## Usage
 
