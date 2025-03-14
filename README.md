@@ -41,6 +41,7 @@
     * [Adding tasks](#adding-tasks)
     * [Starting the dispatcher](#starting-the-dispatcher)
     * [Shutting down the dispatcher](#shutting-down-the-dispatcher)
+    * [Example](#example)
 * [Roadmap](#roadmap)
 
 ## Introduction
@@ -189,7 +190,7 @@ Until a more robust system is provided, to install the database schema, call `cl
 
 ### Declaring a Task type
 
-Any type can be a task as long as it implements the `Task` interface, which requires only the `Config() QueueConfig` method, used to provide information about the queue that these tasks will be added to. As an example, this is a task used to send new order email notifications:
+Any type can be a task as long as it implements the `Task` interface, which requires only the `Config() QueueConfig` method, used to provide information about the queue that these tasks will be added to. All fields should be exported. As an example, this is a task used to send new order email notifications:
 
 ```go
 type NewOrderEmailTask struct {
@@ -289,6 +290,10 @@ client.Stop(ctx)
 This will wait up to 5 seconds for all workers to complete the task they are currently working on.
 
 If you want to hard-stop the dispatcher, cancel the context that was provided when calling `client.Start()`.
+
+### Example
+
+To see a working example, check out the example provided in [Pagoda](https://github.com/mikestefanello/pagoda/?tab=readme-ov-file#queues). When the app starts, a queue is defined and the dispatcher is started. There is a web route that includes a form which creates a task in the queue when it is submitted.
 
 ## Roadmap
 
