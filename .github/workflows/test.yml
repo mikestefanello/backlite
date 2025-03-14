@@ -11,12 +11,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.22
+        go-version: 1.23
 
     - uses: actions/cache@v3
       with:
@@ -29,3 +29,13 @@ jobs:
 
     - name: Test
       run: go test ./...
+
+    - name: Update coverage report
+      uses: ncruces/go-coverage-report@v0
+      with:
+        report: true
+        chart: true
+        amend: true
+      if: |
+        github.event_name == 'push'
+      continue-on-error: true
