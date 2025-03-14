@@ -107,6 +107,7 @@ func GetCompletedTasks(ctx context.Context, db *sql.DB, query string, args ...an
 
 		task.LastExecutedAt = time.UnixMilli(lastExecutedAt)
 		task.CreatedAt = time.UnixMilli(createdAt)
+		task.LastDuration *= 1000
 
 		if expiresAt != nil {
 			v := time.UnixMilli(*expiresAt)

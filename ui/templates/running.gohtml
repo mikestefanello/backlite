@@ -20,11 +20,9 @@
                                     <td><span class="status-dot status-dot-animated status-yellow"></span></td>
                                     <td>{{.Queue}}</td>
                                     <td class="text-secondary">{{.Attempts}}</td>
-                                    <td class="text-secondary">{{.CreatedAt}}</td>
-                                    <td class="text-secondary">{{.ClaimedAt}}</td>
-                                    <td>
-                                        <a href="/task/{{.ID}}">View</a>
-                                    </td>
+                                    <td class="text-secondary">{{datetime .CreatedAt}}</td>
+                                    <td class="text-secondary">{{datetime .ClaimedAt}}</td>
+                                    <td><a href="/task/{{.ID}}">View</a></td>
                                 </tr>
                             {{end}}
                         </tbody>

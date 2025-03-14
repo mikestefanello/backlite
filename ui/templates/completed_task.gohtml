@@ -12,15 +12,9 @@
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
                                     {{if .Succeeded}}
-                                        <span class="status status-green">
-                                          <span class="status-dot"></span>
-                                          Succeeded
-                                        </span>
+                                        <span class="status status-green"><span class="status-dot"></span>Succeeded</span>
                                     {{else}}
-                                        <span class="status status-red">
-                                          <span class="status-dot"></span>
-                                          Failed
-                                        </span>
+                                        <span class="status status-red"><span class="status-dot"></span>Failed</span>
                                     {{end}}
                                 </div>
                             </div>
@@ -34,11 +28,11 @@
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Created at</div>
-                                <div class="datagrid-content">{{.CreatedAt}}</div>
+                                <div class="datagrid-content">{{datetime .CreatedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Last executed at</div>
-                                <div class="datagrid-content">{{.LastExecutedAt}}</div>
+                                <div class="datagrid-content">{{datetime .LastExecutedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Last duration</div>
@@ -52,7 +46,7 @@
                                 <div class="datagrid-title">Expires at</div>
                                 <div class="datagrid-content">
                                     {{if .ExpiresAt}}
-                                        {{.ExpiresAt}}
+                                        {{datetime .ExpiresAt}}
                                     {{else}}
                                         Never
                                     {{end}}
@@ -65,9 +59,7 @@
                                 <div class="datagrid-item">
                                     <div class="datagrid-title">Error</div>
                                     <div class="datagrid-content">
-                                        <div class="alert alert-important alert-danger" role="alert">
-                                            {{.Error}}
-                                        </div>
+                                        <div class="alert alert-important alert-danger" role="alert">{{.Error}}</div>
                                     </div>
                                 </div>
                             </div>

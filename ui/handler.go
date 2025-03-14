@@ -17,9 +17,9 @@ import (
 const itemLimit = 25
 
 type (
-	// Handler handles HTTP requests for the backlite UI.
+	// Handler handles HTTP requests for the Backlite UI.
 	Handler struct {
-		// db stores the backlite database.
+		// db stores the Backlite database.
 		db *sql.DB
 	}
 
@@ -58,7 +58,6 @@ func handle(hf handleFunc) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, err)
 			log.Println(err)
-			return
 		}
 	}
 }
@@ -76,7 +75,7 @@ func (h *Handler) Running(w http.ResponseWriter, req *http.Request) error {
 // Upcoming renders the upcoming tasks.
 func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) error {
 	// TODO use actual time from the client
-	tasks, err := task.GetScheduledTasks(req.Context(), h.db, time.Now().Add(time.Hour), itemLimit)
+	tasks, err := task.GetScheduledTasks(req.Context(), h.db, time.Now().Add(-time.Hour), itemLimit)
 	if err != nil {
 		return err
 	}

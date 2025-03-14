@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"text/template"
+	"time"
 )
 
 //go:embed templates/*.gohtml
@@ -23,6 +24,7 @@ func mustParse(page string) *template.Template {
 		Funcs(
 			template.FuncMap{
 				"bytestring": bytestring,
+				"datetime":   datetime,
 			}).
 		ParseFS(
 			templates,
@@ -38,4 +40,8 @@ func mustParse(page string) *template.Template {
 
 func bytestring(b []byte) string {
 	return string(b)
+}
+
+func datetime(t time.Time) string {
+	return t.Local().Format("02 Jan 2006 15:04:05 MST")
 }

@@ -12,15 +12,9 @@
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
                                     {{if .ClaimedAt}}
-                                        <span class="status status-yellow">
-                                          <span class="status-dot status-dot-animated"></span>
-                                          Running
-                                        </span>
+                                        <span class="status status-yellow"><span class="status-dot status-dot-animated"></span>Running</span>
                                     {{else}}
-                                        <span class="status status-azure">
-                                          <span class="status-dot"></span>
-                                          Upcoming
-                                        </span>
+                                        <span class="status status-azure"><span class="status-dot"></span>Upcoming</span>
                                     {{end}}
                                 </div>
                             </div>
@@ -34,13 +28,13 @@
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Created at</div>
-                                <div class="datagrid-content">{{.CreatedAt}}</div>
+                                <div class="datagrid-content">{{datetime .CreatedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Started</div>
                                 <div class="datagrid-content">
                                     {{if .ClaimedAt}}
-                                        {{.ClaimedAt}}
+                                        {{datetime .ClaimedAt}}
                                     {{else}}
                                         -
                                     {{end}}
@@ -50,7 +44,7 @@
                                 <div class="datagrid-title">Wait until</div>
                                 <div class="datagrid-content">
                                     {{if .WaitUntil}}
-                                        {{.WaitUntil}}
+                                        {{datetime .WaitUntil}}
                                     {{else}}
                                         -
                                     {{end}}
@@ -66,7 +60,7 @@
                                 <div class="datagrid-title">Last executed at</div>
                                 <div class="datagrid-content">
                                     {{if .LastExecutedAt}}
-                                        {{.LastExecutedAt}}
+                                        {{datetime .LastExecutedAt}}
                                     {{else}}
                                         -
                                     {{end}}

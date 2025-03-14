@@ -21,8 +21,8 @@
                                     <td><span class="status-dot status-{{if .Succeeded}}green{{else}}red{{end}}"></span></td>
                                     <td>{{.Queue}}</td>
                                     <td class="text-secondary">{{.Attempts}}</td>
-                                    <td class="text-secondary">{{.CreatedAt}}</td>
-                                    <td class="text-secondary">{{.LastExecutedAt}}</td>
+                                    <td class="text-secondary">{{datetime .CreatedAt}}</td>
+                                    <td class="text-secondary">{{datetime .LastExecutedAt}}</td>
                                     <td class="text-secondary">{{.LastDuration}}</td>
                                     <td>
                                         <a href="/completed/{{.ID}}">View</a>
