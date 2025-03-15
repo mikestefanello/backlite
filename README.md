@@ -298,7 +298,7 @@ To see a working example, check out the example provided in [Pagoda](https://git
 
 ## Roadmap
 
-- Finish Web UI
+- Expand testing
 - Hooks
 - Expand processor context to store attempt number, other data
 - Avoid needing to call Notify() when using transaction
@@ -307,4 +307,3 @@ To see a working example, check out the example provided in [Pagoda](https://git
 - Store queue stats in a separate table?
 - Pause/resume queues
 - Benchmarks
-- Expand testing

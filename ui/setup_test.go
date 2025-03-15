@@ -27,7 +27,7 @@ var (
 			Attempts:       1,
 			WaitUntil:      nil,
 			CreatedAt:      time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
-			LastExecutedAt: ptr(time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)),
+			LastExecutedAt: testutil.Pointer(time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)),
 		},
 		{
 			ID:             "2",
@@ -47,14 +47,14 @@ var (
 			Attempts:       2,
 			WaitUntil:      nil,
 			CreatedAt:      time.Date(2025, 1, 5, 0, 0, 0, 0, time.UTC),
-			LastExecutedAt: ptr(time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)),
+			LastExecutedAt: testutil.Pointer(time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)),
 		},
 		{
 			ID:             "4",
 			Queue:          "testqueueUs",
 			Task:           genTask(4),
 			Attempts:       0,
-			WaitUntil:      ptr(time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC)),
+			WaitUntil:      testutil.Pointer(time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC)),
 			CreatedAt:      time.Date(2025, 1, 7, 0, 0, 0, 0, time.UTC),
 			LastExecutedAt: nil,
 		},
@@ -67,7 +67,7 @@ var (
 			Attempts:       4,
 			Succeeded:      true,
 			LastDuration:   5 * time.Second,
-			ExpiresAt:      ptr(time.Date(2025, 2, 8, 0, 0, 0, 0, time.UTC)),
+			ExpiresAt:      testutil.Pointer(time.Date(2025, 2, 8, 0, 0, 0, 0, time.UTC)),
 			CreatedAt:      time.Date(2025, 3, 9, 0, 0, 0, 0, time.UTC),
 			LastExecutedAt: time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC),
 		},
@@ -91,10 +91,10 @@ var (
 			Attempts:       2,
 			Succeeded:      false,
 			LastDuration:   5123 * time.Millisecond,
-			ExpiresAt:      ptr(time.Date(2025, 5, 8, 0, 0, 0, 0, time.UTC)),
+			ExpiresAt:      testutil.Pointer(time.Date(2025, 5, 8, 0, 0, 0, 0, time.UTC)),
 			CreatedAt:      time.Date(2025, 5, 9, 0, 0, 0, 0, time.UTC),
 			LastExecutedAt: time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC),
-			Error:          ptr("bad thing happened"),
+			Error:          testutil.Pointer("bad thing happened"),
 		},
 		{
 			ID:             "8",
@@ -106,7 +106,7 @@ var (
 			ExpiresAt:      nil,
 			CreatedAt:      time.Date(2025, 4, 11, 0, 0, 0, 0, time.UTC),
 			LastExecutedAt: time.Date(2025, 4, 12, 0, 0, 0, 0, time.UTC),
-			Error:          ptr("bad thing happened again!"),
+			Error:          testutil.Pointer("bad thing happened again!"),
 		},
 	}
 )
@@ -170,7 +170,7 @@ func seedTestData() {
 		if err != nil {
 			panic(err)
 		}
-		t.ClaimedAt = ptr(now)
+		t.ClaimedAt = testutil.Pointer(now)
 
 		// Set the last executed time for tasks so we can assert it in the UI.
 		if t.LastExecutedAt != nil {
@@ -195,10 +195,6 @@ func seedTestData() {
 			}
 		}
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }
 
 func genTask(num int) []byte {

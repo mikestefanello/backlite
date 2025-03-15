@@ -12,7 +12,7 @@ import (
 
 // Task is a task that is queued for execution.
 type Task struct {
-	// ID is the Task ID
+	// ID is the Task ID.
 	ID string
 
 	// Queue is the name of the queue this Task belongs to.
