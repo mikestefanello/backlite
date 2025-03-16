@@ -191,3 +191,26 @@ func TestTaskAddOp_Save__Transaction(t *testing.T) {
 	got := testutil.GetTasks(t, c.db)
 	testutil.Length(t, got, 1)
 }
+
+func TestTaskAddOp_Save__EncodeFailure(t *testing.T) {
+	c := mustNewClient(t)
+	m := &mockDispatcher{}
+	c.dispatcher = m
+	defer c.db.Close()
+
+	tx, err := c.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Install(); err != nil {
+		t.Fatal(err)
+	}
+
+	tk := testTaskEncodeFail{Val: make(chan int)}
+	op := c.Add(tk).Tx(tx)
+
+	if err = op.Save(); err == nil {
+		t.Error("expected error")
+	}
+}

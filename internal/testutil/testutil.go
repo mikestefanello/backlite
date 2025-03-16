@@ -158,6 +158,14 @@ func IsTask(t *testing.T, expected, got task.Task) {
 	default:
 		t.Error("LastExecutedAt not equal")
 	}
+
+	switch {
+	case expected.ClaimedAt == nil && got.ClaimedAt == nil:
+	case expected.ClaimedAt != nil && got.ClaimedAt != nil:
+		Equal(t, "ClaimedAt", *expected.ClaimedAt, *got.ClaimedAt)
+	default:
+		t.Error("ClaimedAt not equal")
+	}
 }
 
 func Encode(t *testing.T, v any) []byte {

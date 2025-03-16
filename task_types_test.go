@@ -115,3 +115,13 @@ func (t testTaskNoName) Config() QueueConfig {
 		Name: "",
 	}
 }
+
+type testTaskEncodeFail struct {
+	Val chan int
+}
+
+func (t testTaskEncodeFail) Config() QueueConfig {
+	return QueueConfig{
+		Name: "encode-failer",
+	}
+}
