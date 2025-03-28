@@ -2,7 +2,8 @@
     <div class="row">
         <div class="col-12 col-md-6 col-lg">
             <div class="card">
-                {{if .}}
+                {{if .Content}}
+                    {{$task := .Content}}
                     <div class="card-header">
                         <h3 class="card-title">Completed task</h3>
                     </div>
@@ -11,7 +12,7 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
-                                    {{if .Succeeded}}
+                                    {{if $task.Succeeded}}
                                         <span class="status status-green"><span class="status-dot"></span>Succeeded</span>
                                     {{else}}
                                         <span class="status status-red"><span class="status-dot"></span>Failed</span>
@@ -20,46 +21,46 @@
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Queue</div>
-                                <div class="datagrid-content">{{.Queue}}</div>
+                                <div class="datagrid-content">{{$task.Queue}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">ID</div>
-                                <div class="datagrid-content">{{.ID}}</div>
+                                <div class="datagrid-content">{{$task.ID}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Created at</div>
-                                <div class="datagrid-content">{{datetime .CreatedAt}}</div>
+                                <div class="datagrid-content">{{datetime $task.CreatedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Last executed at</div>
-                                <div class="datagrid-content">{{datetime .LastExecutedAt}}</div>
+                                <div class="datagrid-content">{{datetime $task.LastExecutedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Last duration</div>
-                                <div class="datagrid-content">{{.LastDuration}}</div>
+                                <div class="datagrid-content">{{$task.LastDuration}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Attempts</div>
-                                <div class="datagrid-content">{{.Attempts}}</div>
+                                <div class="datagrid-content">{{$task.Attempts}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Expires at</div>
                                 <div class="datagrid-content">
-                                    {{if .ExpiresAt}}
-                                        {{datetime .ExpiresAt}}
+                                    {{if $task.ExpiresAt}}
+                                        {{datetime $task.ExpiresAt}}
                                     {{else}}
                                         Never
                                     {{end}}
                                 </div>
                             </div>
                         </div>
-                        {{if .Error}}
+                        {{if $task.Error}}
                             <br />
                             <div class="datagrid">
                                 <div class="datagrid-item">
                                     <div class="datagrid-title">Error</div>
                                     <div class="datagrid-content">
-                                        <div class="alert alert-important alert-danger" role="alert">{{.Error}}</div>
+                                        <div class="alert alert-important alert-danger" role="alert">{{$task.Error}}</div>
                                     </div>
                                 </div>
                             </div>
@@ -69,8 +70,8 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Data</div>
                                 <div class="datagrid-content">
-                                    {{if .Task}}
-                                        <kbd>{{bytestring .Task}}</kbd>
+                                    {{if $task.Task}}
+                                        <kbd>{{bytestring $task.Task}}</kbd>
                                     {{else}}
                                         Not retained
                                     {{end}}
@@ -79,9 +80,7 @@
                         </div>
                     </div>
                 {{else}}
-                    <div class="card-header">
-                        <h3 class="card-title">Task not found!</h3>
-                    </div>
+                    {{template "notfound" "Task not found!"}}
                 {{end}}
             </div>
         </div>

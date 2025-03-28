@@ -25,6 +25,7 @@ func mustParse(page string) *template.Template {
 			template.FuncMap{
 				"bytestring": bytestring,
 				"datetime":   datetime,
+				"add":        add,
 			}).
 		ParseFS(
 			templates,
@@ -44,4 +45,8 @@ func bytestring(b []byte) string {
 
 func datetime(t time.Time) string {
 	return t.Local().Format("02 Jan 2006 15:04:05 MST")
+}
+
+func add(a, b int) int {
+	return a + b
 }

@@ -91,11 +91,28 @@ func GetTasks(ctx context.Context, db *sql.DB, query string, args ...any) (Tasks
 // It's important to note that this does not filter out tasks that are not yet ready based on their wait time.
 // The deadline provided is used to include tasks that have been claimed if that given amount of time has elapsed.
 func GetScheduledTasks(ctx context.Context, db *sql.DB, deadline time.Time, limit int) (Tasks, error) {
+	return GetScheduledTasksWithOffset(
+		ctx,
+		db,
+		deadline,
+		limit,
+		0,
+	)
+}
+
+// GetScheduledTasksWithOffset is the same as GetScheduledTasks but with an offset for paging.
+func GetScheduledTasksWithOffset(
+	ctx context.Context,
+	db *sql.DB,
+	deadline time.Time,
+	limit,
+	offset int) (Tasks, error) {
 	return GetTasks(
 		ctx,
 		db,
 		query.SelectScheduledTasks,
 		deadline.UnixMilli(),
 		limit,
+		offset,
 	)
 }

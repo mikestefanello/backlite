@@ -149,7 +149,7 @@ err := http.ListenAndServe(":9000", mux)
 
 Then visit the given port and/or domain in your browser (ie, `localhost:9000`).
 
-The web CSS and JS are provided by [tabler](https://github.com/tabler/tabler).
+The web CSS is provided by [tabler](https://github.com/tabler/tabler).
 
 ### Panic recovery
 

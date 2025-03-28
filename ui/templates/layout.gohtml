@@ -2,7 +2,6 @@
 <html lang="en" style="height:100%;">
     <head>
         <title>Backlite</title>
-        <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js"></script>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css">
     </head>
     <body>
@@ -58,10 +57,38 @@
             <div class="page-wrapper">
                 <div class="page-body">
                     <div class="container-xl">
-                        {{template "content" .Content}}
+                        {{template "content" .}}
                     </div>
                 </div>
             </div>
         </div>
     </body>
 </html>
+
+{{define "pager"}}
+    <div class="card-footer d-flex align-items-center">
+        <ul class="pagination m-0 ms-auto">
+            <li class="page-item {{if eq .Page 1}}disabled{{end}}">
+                <a class="page-link" href="{{.Path}}?page={{add .Page -1}}" {{if eq .Page 1}}aria-disabled="true"{{end}}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+                        <path d="M15 6l-6 6l6 6"></path>
+                    </svg>
+                    prev
+                </a>
+            </li>
+
+            <li class="page-item">
+                <a class="page-link" href="{{.Path}}?page={{add .Page 1}}">
+                    next
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+                        <path d="M9 6l6 6l-6 6"></path>
+                    </svg>
+                </a>
+            </li>
+        </ul>
+    </div>
+{{end}}
+
+{{define "notfound"}}
+    <div class="card-body">{{.}}</div>
+{{end}}

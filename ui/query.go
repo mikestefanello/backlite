@@ -49,6 +49,7 @@ const selectRunningTasks = `
 	WHERE
 	    claimed_at IS NOT NULL
 	LIMIT ?
+	OFFSET ?
 `
 const selectCompletedTasks = `
 	SELECT
@@ -69,4 +70,5 @@ const selectCompletedTasks = `
 	ORDER BY
 	    last_executed_at DESC
 	LIMIT ?
+	OFFSET ?
 `

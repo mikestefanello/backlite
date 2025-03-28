@@ -27,6 +27,7 @@ const SelectScheduledTasks = `
 	    wait_until ASC,
 		id ASC
 	LIMIT ?
+	OFFSET ?
 `
 
 const DeleteTask = `

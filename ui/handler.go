@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"strconv"
 	"text/template"
 	"time"
 
@@ -30,6 +32,9 @@ type (
 
 		// Content is the data to render.
 		Content any
+
+		// Page is the page number.
+		Page int
 	}
 
 	// handleFunc is an HTTP handle func that returns an error.
@@ -64,7 +69,13 @@ func handle(hf handleFunc) http.HandlerFunc {
 
 // Running renders the running tasks.
 func (h *Handler) Running(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetTasks(req.Context(), h.db, selectRunningTasks, itemLimit)
+	tasks, err := task.GetTasks(
+		req.Context(),
+		h.db,
+		selectRunningTasks,
+		itemLimit,
+		getOffset(req.URL),
+	)
 	if err != nil {
 		return err
 	}
@@ -74,8 +85,13 @@ func (h *Handler) Running(w http.ResponseWriter, req *http.Request) error {
 
 // Upcoming renders the upcoming tasks.
 func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) error {
-	// TODO use actual time from the client
-	tasks, err := task.GetScheduledTasks(req.Context(), h.db, time.Now().Add(-time.Hour), itemLimit)
+	tasks, err := task.GetScheduledTasksWithOffset(
+		req.Context(),
+		h.db,
+		time.Now().Add(-time.Hour), // TODO use actual time from the client
+		itemLimit,
+		getOffset(req.URL),
+	)
 	if err != nil {
 		return err
 	}
@@ -85,7 +101,14 @@ func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) error {
 
 // Succeeded renders the completed tasks that have succeeded.
 func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 1, itemLimit)
+	tasks, err := task.GetCompletedTasks(
+		req.Context(),
+		h.db,
+		selectCompletedTasks,
+		1,
+		itemLimit,
+		getOffset(req.URL),
+	)
 	if err != nil {
 		return err
 	}
@@ -95,7 +118,14 @@ func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) error {
 
 // Failed renders the completed tasks that have failed.
 func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) error {
-	tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTasks, 0, itemLimit)
+	tasks, err := task.GetCompletedTasks(
+		req.Context(),
+		h.db,
+		selectCompletedTasks,
+		0,
+		itemLimit,
+		getOffset(req.URL),
+	)
 	if err != nil {
 		return err
 	}
@@ -139,5 +169,21 @@ func (h *Handler) render(req *http.Request, w io.Writer, tmpl *template.Template
 	return tmpl.ExecuteTemplate(w, "layout.gohtml", templateData{
 		Path:    req.URL.Path,
 		Content: data,
+		Page:    getPage(req.URL),
 	})
+}
+
+func getPage(u *url.URL) int {
+	if p := u.Query().Get("page"); p != "" {
+		if page, err := strconv.Atoi(p); err == nil {
+			if page > 0 {
+				return page
+			}
+		}
+	}
+	return 1
+}
+
+func getOffset(u *url.URL) int {
+	return (getPage(u) - 1) * itemLimit
 }

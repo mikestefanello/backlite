@@ -201,7 +201,7 @@ func genTask(num int) []byte {
 	return []byte(fmt.Sprintf(`{"value": %d}`, num))
 }
 
-func request(t *testing.T, hf handleFunc, url string) (*httptest.ResponseRecorder, *goquery.Document) {
+func request(t *testing.T, url string) (*httptest.ResponseRecorder, *goquery.Document) {
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

@@ -2,7 +2,8 @@
     <div class="row">
         <div class="col-12 col-md-6 col-lg">
             <div class="card">
-                {{if .}}
+                {{if .Content}}
+                    {{$task := .Content}}
                     <div class="card-header">
                         <h3 class="card-title">Task</h3>
                     </div>
@@ -11,7 +12,7 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Status</div>
                                 <div class="datagrid-content">
-                                    {{if .ClaimedAt}}
+                                    {{if $task.ClaimedAt}}
                                         <span class="status status-yellow"><span class="status-dot status-dot-animated"></span>Running</span>
                                     {{else}}
                                         <span class="status status-azure"><span class="status-dot"></span>Upcoming</span>
@@ -20,21 +21,21 @@
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Queue</div>
-                                <div class="datagrid-content">{{.Queue}}</div>
+                                <div class="datagrid-content">{{$task.Queue}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">ID</div>
-                                <div class="datagrid-content">{{.ID}}</div>
+                                <div class="datagrid-content">{{$task.ID}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Created at</div>
-                                <div class="datagrid-content">{{datetime .CreatedAt}}</div>
+                                <div class="datagrid-content">{{datetime $task.CreatedAt}}</div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Started</div>
                                 <div class="datagrid-content">
-                                    {{if .ClaimedAt}}
-                                        {{datetime .ClaimedAt}}
+                                    {{if $task.ClaimedAt}}
+                                        {{datetime $task.ClaimedAt}}
                                     {{else}}
                                         -
                                     {{end}}
@@ -43,8 +44,8 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Wait until</div>
                                 <div class="datagrid-content">
-                                    {{if .WaitUntil}}
-                                        {{datetime .WaitUntil}}
+                                    {{if $task.WaitUntil}}
+                                        {{datetime $task.WaitUntil}}
                                     {{else}}
                                         -
                                     {{end}}
@@ -53,14 +54,14 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Attempts</div>
                                 <div class="datagrid-content">
-                                    {{.Attempts}}
+                                    {{$task.Attempts}}
                                 </div>
                             </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Last executed at</div>
                                 <div class="datagrid-content">
-                                    {{if .LastExecutedAt}}
-                                        {{datetime .LastExecutedAt}}
+                                    {{if $task.LastExecutedAt}}
+                                        {{datetime $task.LastExecutedAt}}
                                     {{else}}
                                         -
                                     {{end}}
@@ -69,15 +70,13 @@
                             <div class="datagrid-item">
                                 <div class="datagrid-title">Data</div>
                                 <div class="datagrid-content">
-                                    <kbd>{{bytestring .Task}}</kbd>
+                                    <kbd>{{bytestring $task.Task}}</kbd>
                                 </div>
                             </div>
                         </div>
                     </div>
                 {{else}}
-                    <div class="card-header">
-                        <h3 class="card-title">Task not found!</h3>
-                    </div>
+                    {{template "notfound" "Task not found!"}}
                 {{end}}
             </div>
         </div>

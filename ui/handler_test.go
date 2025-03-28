@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -16,9 +18,10 @@ import (
 )
 
 func TestHandler_Running(t *testing.T) {
-	url := "/"
-	_, doc := request(t, h.Running, url)
-	assertNav(t, doc, url)
+	path := "/"
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
+	assertPager(t, doc, path)
 
 	headers := doc.Find("tr th")
 	testutil.Equal(t, "headers", 6, headers.Length())
@@ -62,9 +65,10 @@ func TestHandler_Running(t *testing.T) {
 }
 
 func TestHandler_Upcoming(t *testing.T) {
-	url := "/upcoming"
-	_, doc := request(t, h.Upcoming, url)
-	assertNav(t, doc, url)
+	path := "/upcoming"
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
+	assertPager(t, doc, path)
 
 	headers := doc.Find("tr th")
 	testutil.Equal(t, "headers", 6, headers.Length())
@@ -112,9 +116,10 @@ func TestHandler_Upcoming(t *testing.T) {
 }
 
 func TestHandler_Succeeded(t *testing.T) {
-	url := "/succeeded"
-	_, doc := request(t, h.Succeeded, url)
-	assertNav(t, doc, url)
+	path := "/succeeded"
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
+	assertPager(t, doc, path)
 
 	headers := doc.Find("tr th")
 	testutil.Equal(t, "headers", 7, headers.Length())
@@ -162,9 +167,10 @@ func TestHandler_Succeeded(t *testing.T) {
 }
 
 func TestHandler_Failed(t *testing.T) {
-	url := "/failed"
-	_, doc := request(t, h.Failed, url)
-	assertNav(t, doc, url)
+	path := "/failed"
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
+	assertPager(t, doc, path)
 
 	headers := doc.Find("tr th")
 	testutil.Equal(t, "headers", 7, headers.Length())
@@ -214,9 +220,9 @@ func TestHandler_Failed(t *testing.T) {
 func TestHandler_Task__Running(t *testing.T) {
 	for n, tk := range tasksRunning {
 		t.Run(fmt.Sprintf("task_%d", n+1), func(t *testing.T) {
-			url := fmt.Sprintf("/task/%s", tk.ID)
-			_, doc := request(t, h.Task, url)
-			assertNav(t, doc, url)
+			path := fmt.Sprintf("/task/%s", tk.ID)
+			_, doc := request(t, path)
+			assertNav(t, doc, path)
 			assertTask(t, doc, tk)
 		})
 	}
@@ -225,9 +231,9 @@ func TestHandler_Task__Running(t *testing.T) {
 func TestHandler_Task__Upcoming(t *testing.T) {
 	for n, tk := range tasksUpcoming {
 		t.Run(fmt.Sprintf("task_%d", n+1), func(t *testing.T) {
-			url := fmt.Sprintf("/task/%s", tk.ID)
-			_, doc := request(t, h.Task, url)
-			assertNav(t, doc, url)
+			path := fmt.Sprintf("/task/%s", tk.ID)
+			_, doc := request(t, path)
+			assertNav(t, doc, path)
 			assertTask(t, doc, tk)
 		})
 	}
@@ -236,9 +242,9 @@ func TestHandler_Task__Upcoming(t *testing.T) {
 func TestHandler_TaskCompleted__Succeeded(t *testing.T) {
 	for n, tk := range tasksSucceeded {
 		t.Run(fmt.Sprintf("task_%d", n+1), func(t *testing.T) {
-			url := fmt.Sprintf("/completed/%s", tk.ID)
-			_, doc := request(t, h.TaskCompleted, url)
-			assertNav(t, doc, url)
+			path := fmt.Sprintf("/completed/%s", tk.ID)
+			_, doc := request(t, path)
+			assertNav(t, doc, path)
 			assertTaskCompleted(t, doc, tk)
 		})
 	}
@@ -247,39 +253,39 @@ func TestHandler_TaskCompleted__Succeeded(t *testing.T) {
 func TestHandler_TaskCompleted__Failed(t *testing.T) {
 	for n, tk := range tasksFailed {
 		t.Run(fmt.Sprintf("task_%d", n+1), func(t *testing.T) {
-			url := fmt.Sprintf("/completed/%s", tk.ID)
-			_, doc := request(t, h.TaskCompleted, url)
-			assertNav(t, doc, url)
+			path := fmt.Sprintf("/completed/%s", tk.ID)
+			_, doc := request(t, path)
+			assertNav(t, doc, path)
 			assertTaskCompleted(t, doc, tk)
 		})
 	}
 }
 
 func TestHandler_Task__IsCompleted(t *testing.T) {
-	url := fmt.Sprintf("/task/%s", tasksSucceeded[0].ID)
+	path := fmt.Sprintf("/task/%s", tasksSucceeded[0].ID)
 	// A completed task can be passed in to the task route and it should redirect.
-	_, doc := request(t, h.Task, url)
-	assertNav(t, doc, url)
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
 	assertTaskCompleted(t, doc, tasksSucceeded[0])
 }
 
 func TestHandler_Task__NotFound(t *testing.T) {
-	url := fmt.Sprintf("/task/abcd")
-	_, doc := request(t, h.Task, url)
-	assertNav(t, doc, url)
+	path := fmt.Sprintf("/task/abcd")
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
 	text := doc.Find("div.page-body").Text()
 	testutil.Equal(t, "body", "Task not found!", strings.TrimSpace(text))
 }
 
 func TestHandler_TaskCompleted__NotFound(t *testing.T) {
-	url := fmt.Sprintf("/completed/abcd")
-	_, doc := request(t, h.Task, url)
-	assertNav(t, doc, url)
+	path := fmt.Sprintf("/completed/abcd")
+	_, doc := request(t, path)
+	assertNav(t, doc, path)
 	text := doc.Find("div.page-body").Text()
 	testutil.Equal(t, "body", "Task not found!", strings.TrimSpace(text))
 }
 
-func assertNav(t *testing.T, doc *goquery.Document, url string) {
+func assertNav(t *testing.T, doc *goquery.Document, path string) {
 	brand := doc.Find(".navbar-brand")
 	testutil.Equal(t, "brand", "Backlite", strings.TrimSpace(brand.Text()))
 
@@ -294,19 +300,50 @@ func assertNav(t *testing.T, doc *goquery.Document, url string) {
 		case 0:
 			testutil.Equal(t, "nav", "Running", strings.TrimSpace(link.Text()))
 			testutil.Equal(t, "href", "/", href)
-			testutil.Equal(t, "active", url == "/", sel.HasClass("active"))
+			testutil.Equal(t, "active", path == "/", sel.HasClass("active"))
 		case 1:
 			testutil.Equal(t, "nav", "Upcoming", strings.TrimSpace(link.Text()))
 			testutil.Equal(t, "href", "/upcoming", href)
-			testutil.Equal(t, "active", url == "/upcoming", sel.HasClass("active"))
+			testutil.Equal(t, "active", path == "/upcoming", sel.HasClass("active"))
 		case 2:
 			testutil.Equal(t, "nav", "Succeeded", strings.TrimSpace(link.Text()))
 			testutil.Equal(t, "href", "/succeeded", href)
-			testutil.Equal(t, "active", url == "/succeeded", sel.HasClass("active"))
+			testutil.Equal(t, "active", path == "/succeeded", sel.HasClass("active"))
 		case 3:
 			testutil.Equal(t, "nav", "Failed", strings.TrimSpace(link.Text()))
 			testutil.Equal(t, "href", "/failed", href)
-			testutil.Equal(t, "active", url == "/failed", sel.HasClass("active"))
+			testutil.Equal(t, "active", path == "/failed", sel.HasClass("active"))
+		}
+	})
+}
+
+func assertPager(t *testing.T, doc *goquery.Document, path string) {
+	pager := doc.Find("div.card-footer ul.pagination li.page-item")
+	testutil.Equal(t, "pagination", 2, pager.Length())
+	u, err := url.Parse(path)
+	if err != nil {
+		t.Fatal("failed to parse path")
+	}
+	page := getPage(u)
+
+	assertHref := func(sel *goquery.Selection, pageNum int) {
+		href, exists := sel.Attr("href")
+		testutil.Equal(t, "href", true, exists)
+		testutil.Equal(t, "href", fmt.Sprintf("%s?page=%d", u.Path, pageNum), href)
+	}
+
+	pager.Each(func(i int, sel *goquery.Selection) {
+		link := sel.Find("a.page-link")
+		switch i {
+		case 0:
+			if page == 1 {
+				testutil.Equal(t, "prev", true, sel.HasClass("disabled"))
+			}
+			testutil.Equal(t, "prev", "prev", strings.TrimSpace(link.Text()))
+			assertHref(link, page-1)
+		case 1:
+			testutil.Equal(t, "next", "next", strings.TrimSpace(link.Text()))
+			assertHref(link, page+1)
 		}
 	})
 }
@@ -319,8 +356,8 @@ func TestHandler_DBFailures(t *testing.T) {
 	defer db.Close()
 	h := NewHandler(db)
 
-	assert := func(t *testing.T, hf handleFunc, url string) {
-		req := httptest.NewRequest(http.MethodGet, url, nil)
+	assert := func(t *testing.T, hf handleFunc, path string) {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		handle(hf)(rec, req)
 
@@ -352,6 +389,156 @@ func TestHandler_DBFailures(t *testing.T) {
 
 	t.Run("completed", func(t *testing.T) {
 		assert(t, h.TaskCompleted, "/completed/1")
+	})
+}
+
+func TestHandler_NoTasks(t *testing.T) {
+	db := testutil.NewDB(t)
+	defer db.Close()
+	h := NewHandler(db)
+
+	assert := func(t *testing.T, hf handleFunc, path string) {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handle(hf)(rec, req)
+
+		doc, err := goquery.NewDocumentFromReader(rec.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assertNav(t, doc, path)
+		assertPager(t, doc, path)
+		body := doc.Find("div.table-responsive div.card-body")
+		testutil.Equal(t, "message", "No tasks to display.", strings.TrimSpace(body.Text()))
+	}
+
+	t.Run("running", func(t *testing.T) {
+		assert(t, h.Running, "/")
+	})
+
+	t.Run("upcoming", func(t *testing.T) {
+		assert(t, h.Upcoming, "/upcoming")
+	})
+
+	t.Run("succeeded", func(t *testing.T) {
+		assert(t, h.Succeeded, "/succeeded")
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		assert(t, h.Failed, "/failed")
+	})
+}
+
+func TestHandler_Paging(t *testing.T) {
+	db := testutil.NewDB(t)
+	defer db.Close()
+	h := NewHandler(db)
+
+	toClaim := make(task.Tasks, 0, 30)
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 60; i++ {
+		tk := &task.Task{
+			ID:        fmt.Sprint(i),
+			Queue:     "a",
+			Task:      genTask(1),
+			CreatedAt: time.Now(),
+		}
+		err := tk.InsertTx(context.Background(), tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i >= 30 {
+			toClaim = append(toClaim, tk)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = toClaim.Claim(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 60; i++ {
+		tk := &task.Completed{
+			ID:       fmt.Sprint(i),
+			Queue:    "a",
+			Attempts: 1,
+			Succeeded: func() bool {
+				if i%2 == 0 {
+					return true
+				}
+				return false
+			}(),
+			CreatedAt:      time.Now(),
+			LastExecutedAt: time.Now(),
+		}
+
+		err := tk.InsertTx(context.Background(), tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	assert := func(t *testing.T, hf handleFunc, path string) {
+		var pagerPath string
+		var expectedRows int
+
+		for i := 1; i <= 2; i++ {
+			switch i {
+			case 1:
+				expectedRows = itemLimit
+				pagerPath = path
+			case 2:
+				expectedRows = 5
+				pagerPath = fmt.Sprintf("%s?page=%d", path, i)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, pagerPath, nil)
+			rec := httptest.NewRecorder()
+			handle(hf)(rec, req)
+
+			doc, err := goquery.NewDocumentFromReader(rec.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assertPager(t, doc, pagerPath)
+			rows := doc.Find("tbody tr")
+			testutil.Equal(t, "rows", expectedRows, rows.Length())
+		}
+	}
+
+	t.Run("running", func(t *testing.T) {
+		assert(t, h.Running, "/")
+	})
+
+	t.Run("upcoming", func(t *testing.T) {
+		assert(t, h.Upcoming, "/upcoming")
+	})
+
+	t.Run("succeeded", func(t *testing.T) {
+		assert(t, h.Succeeded, "/succeeded")
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		assert(t, h.Failed, "/failed")
 	})
 }
 

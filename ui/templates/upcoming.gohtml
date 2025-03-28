@@ -3,36 +3,41 @@
         <div class="col-12 col-md-6 col-lg">
             <div class="card">
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table">
-                        <thead>
-                            <tr>
-                                <th class="w-1"></th>
-                                <th>Queue</th>
-                                <th>Attempts</th>
-                                <th>Created at</th>
-                                <th>Last executed at</th>
-                                <th class="w-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{range .}}
+                    {{if .Content}}
+                        <table class="table table-vcenter card-table">
+                            <thead>
                                 <tr>
-                                    <td><span class="status-dot status-azure"></span></td>
-                                    <td>{{.Queue}}</td>
-                                    <td class="text-secondary">{{.Attempts}}</td>
-                                    <td class="text-secondary">{{datetime .CreatedAt}}</td>
-                                    <td class="text-secondary">
-                                        {{if .LastExecutedAt}}
-                                            {{datetime .LastExecutedAt}}
-                                        {{else}}
-                                            Never
-                                        {{end}}
-                                    </td>
-                                    <td><a href="/task/{{.ID}}">View</a></td>
+                                    <th class="w-1"></th>
+                                    <th>Queue</th>
+                                    <th>Attempts</th>
+                                    <th>Created at</th>
+                                    <th>Last executed at</th>
+                                    <th class="w-1"></th>
                                 </tr>
-                            {{end}}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {{range .Content}}
+                                    <tr>
+                                        <td><span class="status-dot status-azure"></span></td>
+                                        <td>{{.Queue}}</td>
+                                        <td class="text-secondary">{{.Attempts}}</td>
+                                        <td class="text-secondary">{{datetime .CreatedAt}}</td>
+                                        <td class="text-secondary">
+                                            {{if .LastExecutedAt}}
+                                                {{datetime .LastExecutedAt}}
+                                            {{else}}
+                                                Never
+                                            {{end}}
+                                        </td>
+                                        <td><a href="/task/{{.ID}}">View</a></td>
+                                    </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    {{else}}
+                        {{template "notfound" "No tasks to display."}}
+                    {{end}}
+                    {{template "pager" .}}
                 </div>
             </div>
         </div>
