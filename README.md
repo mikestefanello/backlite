@@ -143,7 +143,10 @@ To run, pass your `*sql.DB` to `ui.NewHandler()` and register that to an HTTP ha
 
 ```go
 mux := http.DefaultServeMux
-ui.NewHandler(db).Register(mux)
+h, err := ui.NewHandler(ui.Config{
+    DB: db,
+})
+h.Register(mux)
 err := http.ListenAndServe(":9000", mux)
 ```
 

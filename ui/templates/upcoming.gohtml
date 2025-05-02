@@ -29,7 +29,7 @@
                                                 Never
                                             {{end}}
                                         </td>
-                                        <td><a href="/task/{{.ID}}">View</a></td>
+                                        <td><a href="{{ $.FullPath (printf "/task/%s" .ID) }}">View</a></td>
                                     </tr>
                                 {{end}}
                             </tbody>

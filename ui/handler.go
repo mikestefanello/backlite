@@ -2,33 +2,50 @@ package ui
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/mikestefanello/backlite/internal/task"
 )
 
-// itemLimit is the limit of items to fetch from the database.
-// TODO allow this to be configurable via the UI.
-const itemLimit = 25
-
 type (
 	// Handler handles HTTP requests for the Backlite UI.
 	Handler struct {
-		// db stores the Backlite database.
-		db *sql.DB
+		// cfg stores the UI configuration.
+		cfg Config
+	}
+
+	// Config contains configuration for the Handler.
+	Config struct {
+		// DB is the Backlite database.
+		DB *sql.DB
+
+		// BasePath is an optional base path to prepend to all URL paths.
+		BasePath string
+
+		// ItemsPerPage is the maximum amount of items to display per page. This defaults to 25.
+		ItemsPerPage int
+
+		// ReleaseAfter is the duration after which a task is released back to a queue if it has not finished executing.
+		// Ths defaults to one hour, but it should match the value you use in your Backlite client.
+		ReleaseAfter time.Duration
 	}
 
 	// templateData is a wrapper of data sent to templates for rendering.
 	templateData struct {
-		// Path is the current request URL path.
+		// Path is the current request URL path, excluding the base path.
 		Path string
+
+		// BasePath is the configured base path.
+		BasePath string
 
 		// Content is the data to render.
 		Content any
@@ -42,18 +59,50 @@ type (
 )
 
 // NewHandler creates a new handler for the Backlite web UI.
-func NewHandler(db *sql.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(config Config) (*Handler, error) {
+	if config.ReleaseAfter == 0 {
+		config.ReleaseAfter = time.Hour
+	}
+
+	if config.ItemsPerPage == 0 {
+		config.ItemsPerPage = 25
+	}
+
+	if config.BasePath != "" {
+		switch {
+		case strings.HasSuffix(config.BasePath, "/"):
+			return nil, errors.New("base path must not end with /")
+		case !strings.HasPrefix(config.BasePath, "/"):
+			return nil, errors.New("base path must start with /")
+		}
+	}
+
+	switch {
+	case config.DB == nil:
+		return nil, errors.New("db is required")
+	case config.ItemsPerPage <= 0:
+		return nil, errors.New("items per page must be greater than zero")
+	case config.ReleaseAfter < 0:
+		return nil, errors.New("release after must be greater than zero")
+	}
+
+	return &Handler{cfg: config}, nil
 }
 
 // Register registers all available routes.
 func (h *Handler) Register(mux *http.ServeMux) *http.ServeMux {
-	mux.HandleFunc("GET /", handle(h.Running))
-	mux.HandleFunc("GET /upcoming", handle(h.Upcoming))
-	mux.HandleFunc("GET /succeeded", handle(h.Succeeded))
-	mux.HandleFunc("GET /failed", handle(h.Failed))
-	mux.HandleFunc("GET /task/{task}", handle(h.Task))
-	mux.HandleFunc("GET /completed/{task}", handle(h.TaskCompleted))
+	path := func(p string) string {
+		if h.cfg.BasePath != "" && p == "/" {
+			p = ""
+		}
+		return fmt.Sprintf("GET %s%s", h.cfg.BasePath, p)
+	}
+	mux.HandleFunc(path("/"), handle(h.Running))
+	mux.HandleFunc(path("/upcoming"), handle(h.Upcoming))
+	mux.HandleFunc(path("/succeeded"), handle(h.Succeeded))
+	mux.HandleFunc(path("/failed"), handle(h.Failed))
+	mux.HandleFunc(path("/task/{task}"), handle(h.Task))
+	mux.HandleFunc(path("/completed/{task}"), handle(h.TaskCompleted))
 	return mux
 }
 
@@ -71,10 +120,10 @@ func handle(hf handleFunc) http.HandlerFunc {
 func (h *Handler) Running(w http.ResponseWriter, req *http.Request) error {
 	tasks, err := task.GetTasks(
 		req.Context(),
-		h.db,
+		h.cfg.DB,
 		selectRunningTasks,
-		itemLimit,
-		getOffset(req.URL),
+		h.cfg.ItemsPerPage,
+		h.getOffset(req.URL),
 	)
 	if err != nil {
 		return err
@@ -87,10 +136,10 @@ func (h *Handler) Running(w http.ResponseWriter, req *http.Request) error {
 func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) error {
 	tasks, err := task.GetScheduledTasksWithOffset(
 		req.Context(),
-		h.db,
-		time.Now().Add(-time.Hour), // TODO use actual time from the client
-		itemLimit,
-		getOffset(req.URL),
+		h.cfg.DB,
+		time.Now().Add(-h.cfg.ReleaseAfter),
+		h.cfg.ItemsPerPage,
+		h.getOffset(req.URL),
 	)
 	if err != nil {
 		return err
@@ -103,11 +152,11 @@ func (h *Handler) Upcoming(w http.ResponseWriter, req *http.Request) error {
 func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) error {
 	tasks, err := task.GetCompletedTasks(
 		req.Context(),
-		h.db,
+		h.cfg.DB,
 		selectCompletedTasks,
 		1,
-		itemLimit,
-		getOffset(req.URL),
+		h.cfg.ItemsPerPage,
+		h.getOffset(req.URL),
 	)
 	if err != nil {
 		return err
@@ -120,11 +169,11 @@ func (h *Handler) Succeeded(w http.ResponseWriter, req *http.Request) error {
 func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) error {
 	tasks, err := task.GetCompletedTasks(
 		req.Context(),
-		h.db,
+		h.cfg.DB,
 		selectCompletedTasks,
 		0,
-		itemLimit,
-		getOffset(req.URL),
+		h.cfg.ItemsPerPage,
+		h.getOffset(req.URL),
 	)
 	if err != nil {
 		return err
@@ -136,7 +185,7 @@ func (h *Handler) Failed(w http.ResponseWriter, req *http.Request) error {
 // Task renders a task.
 func (h *Handler) Task(w http.ResponseWriter, req *http.Request) error {
 	id := req.PathValue("task")
-	tasks, err := task.GetTasks(req.Context(), h.db, selectTask, id)
+	tasks, err := task.GetTasks(req.Context(), h.cfg.DB, selectTask, id)
 	if err != nil {
 		return err
 	}
@@ -153,7 +202,7 @@ func (h *Handler) Task(w http.ResponseWriter, req *http.Request) error {
 func (h *Handler) TaskCompleted(w http.ResponseWriter, req *http.Request) error {
 	var t *task.Completed
 	id := req.PathValue("task")
-	tasks, err := task.GetCompletedTasks(req.Context(), h.db, selectCompletedTask, id)
+	tasks, err := task.GetCompletedTasks(req.Context(), h.cfg.DB, selectCompletedTask, id)
 	if err != nil {
 		return err
 	}
@@ -166,11 +215,20 @@ func (h *Handler) TaskCompleted(w http.ResponseWriter, req *http.Request) error 
 }
 
 func (h *Handler) render(req *http.Request, w io.Writer, tmpl *template.Template, data any) error {
+	path, _ := strings.CutPrefix(req.URL.Path, h.cfg.BasePath)
+	if path == "" {
+		path = "/"
+	}
 	return tmpl.ExecuteTemplate(w, "layout.gohtml", templateData{
-		Path:    req.URL.Path,
-		Content: data,
-		Page:    getPage(req.URL),
+		Path:     path,
+		BasePath: h.cfg.BasePath,
+		Content:  data,
+		Page:     getPage(req.URL),
 	})
+}
+
+func (h *Handler) getOffset(u *url.URL) int {
+	return (getPage(u) - 1) * h.cfg.ItemsPerPage
 }
 
 func getPage(u *url.URL) int {
@@ -184,6 +242,10 @@ func getPage(u *url.URL) int {
 	return 1
 }
 
-func getOffset(u *url.URL) int {
-	return (getPage(u) - 1) * itemLimit
+// FullPath outputs a given path in full, including the base path.
+func (t templateData) FullPath(path string) string {
+	if t.BasePath != "" && path == "/" {
+		path = ""
+	}
+	return fmt.Sprintf("%s%s", t.BasePath, path)
 }

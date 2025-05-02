@@ -17,6 +17,91 @@ import (
 	"github.com/mikestefanello/backlite/internal/testutil"
 )
 
+func TestHandler_Validation(t *testing.T) {
+	db := testutil.NewDB(t)
+
+	t.Run("release after", func(t *testing.T) {
+		t.Run("invalid", func(t *testing.T) {
+			_, err := NewHandler(Config{
+				DB:           db,
+				ReleaseAfter: time.Second * -5,
+			})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+
+		t.Run("default", func(t *testing.T) {
+			h, err := NewHandler(Config{
+				DB: db,
+			})
+			if err != nil {
+				t.Fatal("unexpected error")
+			}
+			testutil.Equal(t, "ReleaseAfter", time.Hour, h.cfg.ReleaseAfter)
+		})
+	})
+
+	t.Run("base path invalid", func(t *testing.T) {
+		_, err := NewHandler(Config{
+			DB:       db,
+			BasePath: "abc",
+		})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+
+		_, err = NewHandler(Config{
+			DB:       db,
+			BasePath: "abc/",
+		})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("db missing", func(t *testing.T) {
+		_, err := NewHandler(Config{})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("items per page", func(t *testing.T) {
+		t.Run("invalid", func(t *testing.T) {
+			_, err := NewHandler(Config{
+				DB:           db,
+				ItemsPerPage: -2,
+			})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+
+		t.Run("default", func(t *testing.T) {
+			h, err := NewHandler(Config{
+				DB: db,
+			})
+			if err != nil {
+				t.Fatal("unexpected error")
+			}
+			testutil.Equal(t, "ItemsPerPage", 25, h.cfg.ItemsPerPage)
+		})
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		_, err := NewHandler(Config{
+			DB:           db,
+			ItemsPerPage: 10,
+			BasePath:     "/dashboard",
+			ReleaseAfter: time.Minute * 5,
+		})
+		if err != nil {
+			t.Fatal("unexpected error")
+		}
+	})
+}
+
 func TestHandler_Running(t *testing.T) {
 	path := "/"
 	_, doc := request(t, path)
@@ -354,7 +439,10 @@ func TestHandler_DBFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	h := NewHandler(db)
+	h, err := NewHandler(Config{DB: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert := func(t *testing.T, hf handleFunc, path string) {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -395,7 +483,10 @@ func TestHandler_DBFailures(t *testing.T) {
 func TestHandler_NoTasks(t *testing.T) {
 	db := testutil.NewDB(t)
 	defer db.Close()
-	h := NewHandler(db)
+	h, err := NewHandler(Config{DB: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert := func(t *testing.T, hf handleFunc, path string) {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -433,7 +524,10 @@ func TestHandler_NoTasks(t *testing.T) {
 func TestHandler_Paging(t *testing.T) {
 	db := testutil.NewDB(t)
 	defer db.Close()
-	h := NewHandler(db)
+	h, err := NewHandler(Config{DB: db})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	toClaim := make(task.Tasks, 0, 30)
 	tx, err := db.Begin()
@@ -503,7 +597,7 @@ func TestHandler_Paging(t *testing.T) {
 		for i := 1; i <= 2; i++ {
 			switch i {
 			case 1:
-				expectedRows = itemLimit
+				expectedRows = h.cfg.ItemsPerPage
 				pagerPath = path
 			case 2:
 				expectedRows = 5

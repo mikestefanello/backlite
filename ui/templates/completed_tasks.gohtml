@@ -26,7 +26,7 @@
                                         <td class="text-secondary">{{datetime .LastExecutedAt}}</td>
                                         <td class="text-secondary">{{.LastDuration}}</td>
                                         <td>
-                                            <a href="/completed/{{.ID}}">View</a>
+                                            <a href="{{ $.FullPath (printf "/completed/%s" .ID) }}">View</a>
                                         </td>
                                     </tr>
                                 {{end}}

@@ -112,6 +112,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	var err error
 	t := &testing.T{}
 	db := testutil.NewDB(t)
 	if t.Failed() {
@@ -119,7 +120,12 @@ func TestMain(m *testing.M) {
 	}
 	defer db.Close()
 
-	h = NewHandler(db)
+	h, err = NewHandler(Config{
+		DB: db,
+	})
+	if err != nil {
+		panic(err)
+	}
 	seedTestData()
 	mux = http.NewServeMux()
 	h.Register(mux)
@@ -127,7 +133,7 @@ func TestMain(m *testing.M) {
 }
 
 func seedTestData() {
-	tx, err := h.db.Begin()
+	tx, err := h.cfg.DB.Begin()
 	if err != nil {
 		panic(err)
 	}
@@ -160,13 +166,13 @@ func seedTestData() {
 		panic(err)
 	}
 
-	if err := tasksRunning.Claim(context.Background(), h.db); err != nil {
+	if err := tasksRunning.Claim(context.Background(), h.cfg.DB); err != nil {
 		panic(err)
 	}
 
 	for _, t := range tasksRunning {
 		// Set a fixed time for when the running tasks were claimed so we can assert it in the UI.
-		_, err := h.db.Exec("UPDATE backlite_tasks SET claimed_at = ? WHERE id = ?", now.UnixMilli(), t.ID)
+		_, err := h.cfg.DB.Exec("UPDATE backlite_tasks SET claimed_at = ? WHERE id = ?", now.UnixMilli(), t.ID)
 		if err != nil {
 			panic(err)
 		}
@@ -174,7 +180,7 @@ func seedTestData() {
 
 		// Set the last executed time for tasks so we can assert it in the UI.
 		if t.LastExecutedAt != nil {
-			_, err := h.db.Exec("UPDATE backlite_tasks SET last_executed_at = ? WHERE id = ?", t.LastExecutedAt.UnixMilli(), t.ID)
+			_, err := h.cfg.DB.Exec("UPDATE backlite_tasks SET last_executed_at = ? WHERE id = ?", t.LastExecutedAt.UnixMilli(), t.ID)
 			if err != nil {
 				panic(err)
 			}
@@ -183,7 +189,7 @@ func seedTestData() {
 
 	for _, t := range tasksUpcoming {
 		if t.LastExecutedAt != nil {
-			_, err := h.db.Exec(
+			_, err := h.cfg.DB.Exec(
 				"UPDATE backlite_tasks SET attempts = ?, last_executed_at = ? WHERE id = ?",
 				t.Attempts,
 				t.LastExecutedAt.UnixMilli(),

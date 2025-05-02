@@ -23,7 +23,7 @@
                                         <td class="text-secondary">{{.Attempts}}</td>
                                         <td class="text-secondary">{{datetime .CreatedAt}}</td>
                                         <td class="text-secondary">{{datetime .ClaimedAt}}</td>
-                                        <td><a href="/task/{{.ID}}">View</a></td>
+                                        <td><a href="{{ $.FullPath (printf "/task/%s" .ID) }}">View</a></td>
                                     </tr>
                                 {{end}}
                             </tbody>
