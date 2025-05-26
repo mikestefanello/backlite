@@ -125,5 +125,9 @@ func (q *queues) add(queue Queue) {
 func (q *queues) get(name string) Queue {
 	q.RLock()
 	defer q.RUnlock()
-	return q.registry[name]
+	val, ok := q.registry[name]
+	if !ok {
+		panic(fmt.Sprintf("queue '%s' not registered, ensure all queues are registered before calling Client.Start()", name))
+	}
+	return val
 }
