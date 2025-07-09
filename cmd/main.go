@@ -57,7 +57,7 @@ func main() {
 	defer client.Stop(ctx)
 
 	task := NewOrderEmailTask{OrderID: "123", EmailAddress: "a@b.com"}
-	err = client.
+	taskIDs, err := client.
 		Add(task).
 		Ctx(ctx).
 		Wait(1 * time.Second).
@@ -65,6 +65,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Task IDs:", taskIDs)
+	status, completion, err := client.Query(taskIDs[0])
+	fmt.Println(status, backlite.IsInvalid(completion), err)
 
 	processor := func(ctx context.Context, task NewOrderEmailTask) error {
 		fmt.Printf("running task for email %s", task.EmailAddress)

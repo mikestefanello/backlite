@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -58,7 +59,61 @@ type (
 
 	// ctxKeyClient is used to store a Client in a context.
 	ctxKeyClient struct{}
+
+	// TaskStatus represents the high-level task status as an enum.
+	TaskStatus string
+
+	// taskCompletionStatusError represents the internal error enum for TaskCompletionStatus
+	taskCompletionStatusError string
+
+	// TaskCompletionStatus provides extra information about the complemtion status of exists.
+	TaskCompletionStatus struct {
+		errType taskCompletionStatusError
+		err     error
+	}
 )
+
+const (
+	PendingTaskStatus   = "pending"
+	RunningTaskStatus   = "running"
+	CompletedTaskStatus = "completed"
+
+	invalidTaskCompletionStatus   = "invalid"
+	removedTaskCompletionStatus   = "removed"
+	taskErrorTaskCompletionStatus = "task-error"
+)
+
+func (t *TaskCompletionStatus) Error() string {
+	return t.err.Error()
+}
+
+func newInvalid() *TaskCompletionStatus {
+	return &TaskCompletionStatus{
+		errType: invalidTaskCompletionStatus,
+		err:     fmt.Errorf("Task not completed"),
+	}
+}
+
+func IsInvalid(err error) bool {
+	if tcError, ok := err.(*TaskCompletionStatus); ok {
+		return tcError.errType == invalidTaskCompletionStatus
+	}
+	return false
+}
+
+func IsRemoved(err error) bool {
+	if tcError, ok := err.(*TaskCompletionStatus); ok {
+		return tcError.errType == removedTaskCompletionStatus
+	}
+	return false
+}
+
+func IsTaskError(err error) bool {
+	if tcError, ok := err.(*TaskCompletionStatus); ok {
+		return tcError.errType == taskErrorTaskCompletionStatus
+	}
+	return false
+}
 
 // FromContext returns a Client from a context which is set for queue processor callbacks, so they can access
 // the client in order to create additional tasks.
@@ -149,7 +204,7 @@ func (c *Client) Notify() {
 }
 
 // save saves a task add operation.
-func (c *Client) save(op *TaskAddOp) error {
+func (c *Client) save(op *TaskAddOp) ([]string, error) {
 	var commit bool
 	var err error
 
@@ -170,7 +225,7 @@ func (c *Client) save(op *TaskAddOp) error {
 	if op.tx == nil {
 		op.tx, err = c.db.BeginTx(op.ctx, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		commit = true
 
@@ -188,11 +243,12 @@ func (c *Client) save(op *TaskAddOp) error {
 	}
 
 	// Insert the tasks.
+	taskIDs := make([]string, 0)
 	for _, t := range op.tasks {
 		buf.Reset()
 
 		if err = json.NewEncoder(buf).Encode(t); err != nil {
-			return err
+			return nil, err
 		}
 
 		m := task.Task{
@@ -203,19 +259,26 @@ func (c *Client) save(op *TaskAddOp) error {
 		}
 
 		if err = m.InsertTx(op.ctx, op.tx); err != nil {
-			return err
+			return nil, err
 		}
+		taskIDs = append(taskIDs, m.ID)
 	}
 
 	// If we created the transaction we'll commit it now.
 	if commit {
 		if err = op.tx.Commit(); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Tell the dispatcher that a new task has been added.
 		c.Notify()
 	}
 
-	return nil
+	return taskIDs, nil
+}
+
+// Query returns the status of a task given its ID.
+func (c *Client) Query(taskID string) (TaskStatus, *TaskCompletionStatus, error) {
+	// TODO: actually query and get the task status
+	return CompletedTaskStatus, newInvalid(), nil
 }
