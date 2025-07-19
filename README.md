@@ -40,6 +40,7 @@
     * [Queue processor](#queue-processor)
     * [Registering a queue](#registering-a-queue)
     * [Adding tasks](#adding-tasks)
+    * [Task status](#task-status)
     * [Starting the dispatcher](#starting-the-dispatcher)
     * [Shutting down the dispatcher](#shutting-down-the-dispatcher)
     * [Example](#example)
@@ -259,7 +260,7 @@ You must register all queues with the client by calling `client.Register(queue)`
 To add a task to the queue, simply pass one or many into `client.Add()`. You can provide tasks of different types. This returns a chainable operation which contains many options, that can be used as follows:
 
 ```go
-err := client.
+ids, err := client.
     Add(task1, task2).
     Ctx(ctx).
     Tx(tx).
@@ -276,6 +277,14 @@ The options are:
 * **Tx**: Provide a database transaction to add the tasks to. You must commit this yourself then call `client.Notify()` to tell the dispatcher that the new task(s) were added. This may be improved in the future but for now it is required.
 * **At**: Don't execute this task until at least the given date and time.
 * **Wait**: Wait at least the given duration before executing the task.
+
+### Task status
+
+You can use the client to get the status of a given task. If the [task type](#declaring-a-task-type) does not retain completed tasks, the status returned for completed tasks will be `TaskStatusNotFound`.
+
+```go
+status, err := client.Status(taskID)
+```
 
 ### Starting the dispatcher
 

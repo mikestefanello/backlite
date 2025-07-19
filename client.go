@@ -58,7 +58,8 @@ type (
 
 	// ctxKeyClient is used to store a Client in a context.
 	ctxKeyClient struct{}
-	TaskStatus   int
+
+	TaskStatus int
 )
 
 const (

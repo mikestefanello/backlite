@@ -254,18 +254,26 @@ func TestClient_Status(t *testing.T) {
 	}
 
 	s, err := c.Status(context.Background(), tk.ID)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.Equal(t, "status", TaskStatusNotFound, s)
 
 	testutil.InsertTask(t, c.db, tk)
 	s, err = c.Status(context.Background(), tk.ID)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.Equal(t, "status", TaskStatusPending, s)
 
 	err = task.Tasks{tk}.Claim(context.Background(), c.db)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err = c.Status(context.Background(), tk.ID)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.Equal(t, "status", TaskStatusRunning, s)
 
 	ctk := task.Completed{
@@ -274,7 +282,9 @@ func TestClient_Status(t *testing.T) {
 	}
 	testutil.InsertCompleted(t, c.db, ctk)
 	s, err = c.Status(context.Background(), ctk.ID)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.Equal(t, "status", TaskStatusSuccess, s)
 
 	errStr := "err"
@@ -285,7 +295,9 @@ func TestClient_Status(t *testing.T) {
 	}
 	testutil.InsertCompleted(t, c.db, ctk)
 	s, err = c.Status(context.Background(), ctk.ID)
-	testutil.Equal(t, "error", nil, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	testutil.Equal(t, "status", TaskStatusFailure, s)
 }
 
