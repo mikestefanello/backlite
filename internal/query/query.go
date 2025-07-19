@@ -57,6 +57,20 @@ const DeleteExpiredCompletedTasks = `
 		AND expires_at <= ?
 `
 
+const SelectTaskStatus = `
+	SELECT
+		claimed_at IS NOT NULL AS running,
+		NULL AS success
+	FROM backlite_tasks
+	WHERE id = ?
+	UNION ALL
+	SELECT
+		FALSE AS running,
+		error IS NULL AS success
+	FROM backlite_tasks_completed
+	WHERE id = ?
+`
+
 func ClaimTasks(count int) string {
 	const query = `
 		UPDATE backlite_tasks

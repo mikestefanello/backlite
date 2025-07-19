@@ -58,6 +58,24 @@ type (
 
 	// ctxKeyClient is used to store a Client in a context.
 	ctxKeyClient struct{}
+	TaskStatus   int
+)
+
+const (
+	// TaskStatusPending indicates the task is awaiting execution.
+	TaskStatusPending TaskStatus = iota
+
+	// TaskStatusRunning indicates the task is being executed.
+	TaskStatusRunning
+
+	// TaskStatusSuccess indicates the task completed successfully.
+	TaskStatusSuccess
+
+	// TaskStatusFailure indicates the task execution failed.
+	TaskStatusFailure
+
+	// TaskStatusNotFound indicates the task was not found in the database.
+	TaskStatusNotFound
 )
 
 // FromContext returns a Client from a context which is set for queue processor callbacks, so they can access
@@ -149,7 +167,7 @@ func (c *Client) Notify() {
 }
 
 // save saves a task add operation.
-func (c *Client) save(op *TaskAddOp) error {
+func (c *Client) save(op *TaskAddOp) ([]string, error) {
 	var commit bool
 	var err error
 
@@ -170,7 +188,7 @@ func (c *Client) save(op *TaskAddOp) error {
 	if op.tx == nil {
 		op.tx, err = c.db.BeginTx(op.ctx, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		commit = true
 
@@ -187,12 +205,15 @@ func (c *Client) save(op *TaskAddOp) error {
 		}()
 	}
 
+	// Collect the task IDs.
+	ids := make([]string, len(op.tasks))
+
 	// Insert the tasks.
-	for _, t := range op.tasks {
+	for i, t := range op.tasks {
 		buf.Reset()
 
 		if err = json.NewEncoder(buf).Encode(t); err != nil {
-			return err
+			return nil, err
 		}
 
 		m := task.Task{
@@ -203,19 +224,52 @@ func (c *Client) save(op *TaskAddOp) error {
 		}
 
 		if err = m.InsertTx(op.ctx, op.tx); err != nil {
-			return err
+			return nil, err
 		}
+
+		ids[i] = m.ID
 	}
 
 	// If we created the transaction we'll commit it now.
 	if commit {
 		if err = op.tx.Commit(); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Tell the dispatcher that a new task has been added.
 		c.Notify()
 	}
 
-	return nil
+	return ids, nil
+}
+
+// Status returns the status of a task with a given ID.
+// If the queue does not retain completed tasks, TaskStatusNotFound will be returned
+// for completed tasks rather than TaskStatusSuccess or TaskStatusFailure.
+func (c *Client) Status(ctx context.Context, taskID string) (TaskStatus, error) {
+	var running bool
+	var success *bool
+
+	err := c.db.QueryRowContext(ctx, query.SelectTaskStatus, taskID, taskID).
+		Scan(&running, &success)
+
+	switch err {
+	case nil:
+	case sql.ErrNoRows:
+		return TaskStatusNotFound, nil
+	default:
+		return 0, err
+	}
+
+	if success != nil {
+		if *success {
+			return TaskStatusSuccess, nil
+		}
+		return TaskStatusFailure, nil
+	}
+
+	if running {
+		return TaskStatusRunning, nil
+	}
+	return TaskStatusPending, nil
 }
