@@ -71,12 +71,15 @@ func TestTaskAddOp_Save__Single(t *testing.T) {
 
 	tk := testTask{Val: "a"}
 	op := c.Add(tk)
-	if err := op.Save(); err != nil {
+	ids, err := op.Save()
+	if err != nil {
 		t.Fatal(err)
 	}
+	testutil.Length(t, ids, 1)
 
 	got := testutil.GetTasks(t, c.db)
 	testutil.Length(t, got, 1)
+	testutil.Equal(t, "id", ids[0], got[0].ID)
 
 	testutil.IsTask(t, task.Task{
 		Queue:     tk.Config().Name,
@@ -97,7 +100,7 @@ func TestTaskAddOp_Save__Wait(t *testing.T) {
 	tk := testTask{Val: "f"}
 	op := c.Add(tk).Wait(time.Hour)
 
-	if err := op.Save(); err != nil {
+	if _, err := op.Save(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,12 +125,16 @@ func TestTaskAddOp_Save__Multiple(t *testing.T) {
 	task1 := testTask{Val: "b"}
 	task2 := testTask{Val: "c"}
 	op := c.Add(task1, task2)
-	if err := op.Save(); err != nil {
+	ids, err := op.Save()
+	if err != nil {
 		t.Fatal(err)
 	}
+	testutil.Length(t, ids, 2)
 
 	got := testutil.GetTasks(t, c.db)
 	testutil.Length(t, got, 2)
+	testutil.Equal(t, "id.0", ids[0], got[0].ID)
+	testutil.Equal(t, "id.1", ids[1], got[1].ID)
 
 	testutil.IsTask(t, task.Task{
 		Queue:     task1.Config().Name,
@@ -155,7 +162,7 @@ func TestTaskAddOp_Save__Context(t *testing.T) {
 	op := c.Add(tk).Ctx(ctx)
 	cancel()
 
-	if err := op.Save(); !errors.Is(err, context.Canceled) {
+	if _, err := op.Save(); !errors.Is(err, context.Canceled) {
 		t.Error("expected context cancel")
 	}
 }
@@ -178,7 +185,7 @@ func TestTaskAddOp_Save__Transaction(t *testing.T) {
 	tk := testTask{Val: "e"}
 	op := c.Add(tk).Tx(tx)
 
-	if err = op.Save(); err != nil {
+	if _, err = op.Save(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,7 +217,7 @@ func TestTaskAddOp_Save__EncodeFailure(t *testing.T) {
 	tk := testTaskEncodeFail{Val: make(chan int)}
 	op := c.Add(tk).Tx(tx)
 
-	if err = op.Save(); err == nil {
+	if _, err = op.Save(); err == nil {
 		t.Error("expected error")
 	}
 }

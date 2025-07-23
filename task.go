@@ -51,7 +51,7 @@ func (t *TaskAddOp) Tx(tx *sql.Tx) *TaskAddOp {
 	return t
 }
 
-// Save saves the task, so it can be queued for execution.
-func (t *TaskAddOp) Save() error {
+// Save saves the task, so it can be queued for execution, and returns the task IDs.
+func (t *TaskAddOp) Save() ([]string, error) {
 	return t.client.save(t)
 }

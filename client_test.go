@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikestefanello/backlite/internal/task"
 	"github.com/mikestefanello/backlite/internal/testutil"
 )
 
@@ -241,6 +242,63 @@ func TestClient_FromContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), ctxKeyClient{}, c)
 	got = FromContext(ctx)
 	testutil.Equal(t, "client", got, c)
+}
+
+func TestClient_Status(t *testing.T) {
+	c := mustNewClient(t)
+
+	tk := &task.Task{
+		ID:    "a",
+		Queue: "test",
+		Task:  []byte("test"),
+	}
+
+	s, err := c.Status(context.Background(), tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Equal(t, "status", TaskStatusNotFound, s)
+
+	testutil.InsertTask(t, c.db, tk)
+	s, err = c.Status(context.Background(), tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Equal(t, "status", TaskStatusPending, s)
+
+	err = task.Tasks{tk}.Claim(context.Background(), c.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = c.Status(context.Background(), tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Equal(t, "status", TaskStatusRunning, s)
+
+	ctk := task.Completed{
+		ID:    "b",
+		Queue: "test",
+	}
+	testutil.InsertCompleted(t, c.db, ctk)
+	s, err = c.Status(context.Background(), ctk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Equal(t, "status", TaskStatusSuccess, s)
+
+	errStr := "err"
+	ctk = task.Completed{
+		ID:    "c",
+		Queue: "test",
+		Error: &errStr,
+	}
+	testutil.InsertCompleted(t, c.db, ctk)
+	s, err = c.Status(context.Background(), ctk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Equal(t, "status", TaskStatusFailure, s)
 }
 
 func mustNewClient(t *testing.T) *Client {
