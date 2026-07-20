@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/mikestefanello/backlite/internal/query"
 	"github.com/mikestefanello/backlite/internal/task"
@@ -186,7 +186,7 @@ func Wait() {
 }
 
 func NewDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:/%s?vfs=memdb&_timeout=1000", uuid.New().String()))
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", uuid.New().String()))
 	if err != nil {
 		t.Fatal(err)
 	}

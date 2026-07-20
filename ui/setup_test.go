@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/mikestefanello/backlite/internal/task"
 	"github.com/mikestefanello/backlite/internal/testutil"
+	_ "modernc.org/sqlite"
 )
 
 var (

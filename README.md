@@ -122,7 +122,7 @@ Since SQLite only supports one writer, no continuous database polling is require
 
 ### Driver flexibility
 
-Use any SQLite driver that you'd like. This library only includes [go-sqlite3](https://github.com/mattn/go-sqlite3) since it is used in tests.
+Use any SQLite driver that you'd like. This library only includes [modernc.org/sqlite](https://modernc.org/sqlite) since it is used in tests.
 
 ### Bulk inserts
 

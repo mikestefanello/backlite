@@ -434,7 +434,7 @@ func assertPager(t *testing.T, doc *goquery.Document, path string) {
 }
 
 func TestHandler_DBFailures(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

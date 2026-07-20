@@ -36,6 +36,7 @@ func TestDispatcher_Notify(t *testing.T) {
 
 func TestDispatcher_Start(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 
 	// Start while already started.
 	d.running.Store(true)
@@ -74,6 +75,7 @@ func TestDispatcher_Start(t *testing.T) {
 
 func TestDispatcher_Stop(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	ctx := context.Background()
 
 	// Not running.
@@ -225,6 +227,7 @@ func TestDispatcher_ProcessTask__Context(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var innerCtx context.Context
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ctx = ctx
 	var called bool
 
@@ -260,6 +263,7 @@ func TestDispatcher_ProcessTask__Context(t *testing.T) {
 
 func TestDispatcher_ProcessTask__Success(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 	var called bool
@@ -309,6 +313,7 @@ func TestDispatcher_ProcessTask__Success(t *testing.T) {
 
 func TestDispatcher_ProcessTask__NoRention(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
@@ -336,6 +341,7 @@ func TestDispatcher_ProcessTask__NoRention(t *testing.T) {
 
 func TestDispatcher_ProcessTask__RetainNoData(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
@@ -367,6 +373,7 @@ func TestDispatcher_ProcessTask__RetainNoData(t *testing.T) {
 
 func TestDispatcher_ProcessTask__RetainForever(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
@@ -395,6 +402,7 @@ func TestDispatcher_ProcessTask__RetainForever(t *testing.T) {
 
 func TestDispatcher_ProcessTask__RetainDataFailed(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 	var succeed bool
@@ -441,6 +449,7 @@ func TestDispatcher_ProcessTask__RetainDataFailed(t *testing.T) {
 
 func TestDispatcher_ProcessTask__RetainFailed(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 	var succeed bool
@@ -480,6 +489,7 @@ func TestDispatcher_ProcessTask__RetainFailed(t *testing.T) {
 
 func TestDispatcher_ProcessTask__Panic(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 	var called bool
@@ -510,6 +520,7 @@ func TestDispatcher_ProcessTask__Panic(t *testing.T) {
 
 func TestDispatcher_ProcessTask__Failure(t *testing.T) {
 	d := newDispatcher(t)
+	defer d.client.db.Close()
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 	var called bool
@@ -572,6 +583,8 @@ func TestDispatcher_Fetcher(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	d := newDispatcher(t)
+	defer d.client.db.Close()
+
 	d.ctx = ctx
 	d.shutdownCtx = ctx
 	d.ticker = time.NewTicker(1 * time.Hour)
