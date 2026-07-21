@@ -19,6 +19,7 @@ import (
 
 func TestHandler_Validation(t *testing.T) {
 	db := testutil.NewDB(t)
+	defer db.Close()
 
 	t.Run("release after", func(t *testing.T) {
 		t.Run("invalid", func(t *testing.T) {

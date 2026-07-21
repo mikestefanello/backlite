@@ -8,7 +8,7 @@ import (
 )
 
 func TestQueue_CannotDecode(t *testing.T) {
-	q := NewQueue[testTask](func(_ context.Context, _ testTask) error {
+	q := NewQueue(func(_ context.Context, _ testTask) error {
 		return nil
 	})
 	err := q.Process(context.Background(), []byte{1, 2, 3})

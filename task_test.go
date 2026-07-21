@@ -65,9 +65,9 @@ func TestTaskAddOp_Tx(t *testing.T) {
 
 func TestTaskAddOp_Save__Single(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	tk := testTask{Val: "a"}
 	op := c.Add(tk)
@@ -93,9 +93,9 @@ func TestTaskAddOp_Save__Single(t *testing.T) {
 
 func TestTaskAddOp_Save__Wait(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	tk := testTask{Val: "f"}
 	op := c.Add(tk).Wait(time.Hour)
@@ -118,9 +118,9 @@ func TestTaskAddOp_Save__Wait(t *testing.T) {
 
 func TestTaskAddOp_Save__Multiple(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	task1 := testTask{Val: "b"}
 	task2 := testTask{Val: "c"}
@@ -153,9 +153,9 @@ func TestTaskAddOp_Save__Multiple(t *testing.T) {
 
 func TestTaskAddOp_Save__Context(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	tk := testTask{Val: "d"}
@@ -169,9 +169,9 @@ func TestTaskAddOp_Save__Context(t *testing.T) {
 
 func TestTaskAddOp_Save__Transaction(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -201,9 +201,9 @@ func TestTaskAddOp_Save__Transaction(t *testing.T) {
 
 func TestTaskAddOp_Save__EncodeFailure(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
-	defer c.db.Close()
 
 	tx, err := c.db.Begin()
 	if err != nil {

@@ -1,6 +1,5 @@
 ## Backlite: Type-safe, persistent, embedded task queues and background job runner w/ SQLite
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/mikestefanello/backlite)](https://goreportcard.com/report/github.com/mikestefanello/backlite)
 [![Test](https://github.com/mikestefanello/backlite/actions/workflows/test.yml/badge.svg)](https://github.com/mikestefanello/backlite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mikestefanello/backlite.svg)](https://pkg.go.dev/github.com/mikestefanello/backlite)
@@ -244,7 +243,7 @@ processor := func(ctx context.Context, task NewOrderEmailTask) error {
     return email.Send(ctx, task.EmailAddress, fmt.Sprintf("Order %s received", task.OrderID))
 }
 
-queue := backlite.NewQueue[NewOrderEmailTask](processor)
+queue := backlite.NewQueue(processor)
 ```
 
 The parameter is the processor callback which is what will be called by the dispatcher worker pool to execute the task. If no error is returned, the task is considered successfully executed. If the task fails all attempts and the queue has retention enabled, the value of the error will be stored in the database.
@@ -307,15 +306,3 @@ If you want to hard-stop the dispatcher, cancel the context that was provided wh
 ### Example
 
 To see a working example, check out the example provided in [Pagoda](https://github.com/mikestefanello/pagoda/?tab=readme-ov-file#queues). When the app starts, a queue is defined and the dispatcher is started. There is a web route that includes a form which creates a task in the queue when it is submitted.
-
-## Roadmap
-
-- Expand testing
-- Hooks
-- Expand processor context to store attempt number, other data
-- Avoid needing to call Notify() when using transaction
-- Queue priority
-- Better handling of database schema, migrations
-- Store queue stats in a separate table?
-- Pause/resume queues
-- Benchmarks

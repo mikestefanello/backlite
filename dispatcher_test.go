@@ -231,7 +231,7 @@ func TestDispatcher_ProcessTask__Context(t *testing.T) {
 	d.ctx = ctx
 	var called bool
 
-	d.client.Register(NewQueue[testTask](func(ctx context.Context, _ testTask) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTask) error {
 		called = true
 		innerCtx = ctx
 		deadline, ok := ctx.Deadline()
@@ -268,7 +268,7 @@ func TestDispatcher_ProcessTask__Success(t *testing.T) {
 	d.ctx = context.Background()
 	var called bool
 
-	d.client.Register(NewQueue[testTask](func(ctx context.Context, tk testTask) error {
+	d.client.Register(NewQueue(func(ctx context.Context, tk testTask) error {
 		called = true
 		testutil.Equal(t, "task val", "1", tk.Val)
 		return nil
@@ -317,7 +317,7 @@ func TestDispatcher_ProcessTask__NoRention(t *testing.T) {
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
-	d.client.Register(NewQueue[testTaskNoRention](func(ctx context.Context, _ testTaskNoRention) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTaskNoRention) error {
 		return nil
 	}))
 
@@ -345,7 +345,7 @@ func TestDispatcher_ProcessTask__RetainNoData(t *testing.T) {
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
-	d.client.Register(NewQueue[testTaskRetainNoData](func(ctx context.Context, _ testTaskRetainNoData) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTaskRetainNoData) error {
 		return nil
 	}))
 
@@ -377,7 +377,7 @@ func TestDispatcher_ProcessTask__RetainForever(t *testing.T) {
 	d.ready = make(chan struct{}, 1)
 	d.ctx = context.Background()
 
-	d.client.Register(NewQueue[testTaskRentainForever](func(ctx context.Context, _ testTaskRentainForever) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTaskRentainForever) error {
 		return nil
 	}))
 
@@ -407,7 +407,7 @@ func TestDispatcher_ProcessTask__RetainDataFailed(t *testing.T) {
 	d.ctx = context.Background()
 	var succeed bool
 
-	d.client.Register(NewQueue[testTaskRetainDataFailed](func(ctx context.Context, _ testTaskRetainDataFailed) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTaskRetainDataFailed) error {
 		if succeed {
 			return nil
 		}
@@ -454,7 +454,7 @@ func TestDispatcher_ProcessTask__RetainFailed(t *testing.T) {
 	d.ctx = context.Background()
 	var succeed bool
 
-	d.client.Register(NewQueue[testTaskRetainFailed](func(ctx context.Context, _ testTaskRetainFailed) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTaskRetainFailed) error {
 		if succeed {
 			return nil
 		}
@@ -494,7 +494,7 @@ func TestDispatcher_ProcessTask__Panic(t *testing.T) {
 	d.ctx = context.Background()
 	var called bool
 
-	d.client.Register(NewQueue[testTask](func(ctx context.Context, _ testTask) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTask) error {
 		called = true
 		panic("panic called")
 		return nil
@@ -525,7 +525,7 @@ func TestDispatcher_ProcessTask__Failure(t *testing.T) {
 	d.ctx = context.Background()
 	var called bool
 
-	d.client.Register(NewQueue[testTask](func(ctx context.Context, _ testTask) error {
+	d.client.Register(NewQueue(func(ctx context.Context, _ testTask) error {
 		called = true
 		return errors.New("failure error")
 	}))
@@ -599,7 +599,7 @@ func TestDispatcher_Fetcher(t *testing.T) {
 		d.availableWorkers <- struct{}{}
 	}
 
-	d.client.Register(NewQueue[testTask](func(ctx context.Context, t testTask) error {
+	d.client.Register(NewQueue(func(ctx context.Context, t testTask) error {
 		// Hold so we can test that the tasks were claimed.
 		<-hold
 		return nil

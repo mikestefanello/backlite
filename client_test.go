@@ -124,8 +124,9 @@ func TestNewClient__Validation(t *testing.T) {
 
 func TestClient_Register(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 
-	q := NewQueue[testTask](func(_ context.Context, _ testTask) error {
+	q := NewQueue(func(_ context.Context, _ testTask) error {
 		return nil
 	})
 	c.Register(q)
@@ -144,7 +145,7 @@ func TestClient_Register(t *testing.T) {
 		t.Error("expected panic")
 	}
 
-	q = NewQueue[testTaskNoName](func(_ context.Context, _ testTaskNoName) error {
+	q = NewQueue(func(_ context.Context, _ testTaskNoName) error {
 		return nil
 	})
 	panicked = false
@@ -164,6 +165,7 @@ func TestClient_Register(t *testing.T) {
 
 func TestClient_Install(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 
 	err := c.Install()
 	if err != nil {
@@ -183,6 +185,7 @@ func TestClient_Install(t *testing.T) {
 
 func TestClient_Add(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 
 	t1, t2 := testTask{}, testTask{}
 	op := c.Add(t1, t2)
@@ -202,6 +205,7 @@ func TestClient_Add(t *testing.T) {
 
 func TestClient_Start(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
 
@@ -211,6 +215,7 @@ func TestClient_Start(t *testing.T) {
 
 func TestClient_Stop(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
 
@@ -227,6 +232,7 @@ func TestClient_Stop(t *testing.T) {
 
 func TestClient_Notify(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 	m := &mockDispatcher{}
 	c.dispatcher = m
 
@@ -246,6 +252,7 @@ func TestClient_FromContext(t *testing.T) {
 
 func TestClient_Status(t *testing.T) {
 	c := mustNewClient(t)
+	defer c.db.Close()
 
 	tk := &task.Task{
 		ID:    "a",
