@@ -690,6 +690,80 @@ func TestDispatcher_Fetcher(t *testing.T) {
 	}
 }
 
+func TestDispatcher_Schedule__DueNow(t *testing.T) {
+	d := &dispatcher{
+		ticker: time.NewTicker(time.Hour),
+		ready:  make(chan struct{}, 1),
+	}
+	defer d.ticker.Stop()
+
+	d.schedule(&task.Task{WaitUntil: testutil.Pointer(now())})
+
+	select {
+	case <-d.ready:
+	default:
+		t.Error("due task did not trigger a fetch")
+	}
+}
+
+func TestDispatcher_Fetcher__DueTasksExceedWorkers(t *testing.T) {
+	d := newDispatcher(t)
+	defer d.client.db.Close()
+	d.ctx = context.Background()
+	d.numWorkers = 1
+	d.releaseAfter = time.Hour
+	d.ticker = time.NewTicker(time.Hour)
+	defer d.ticker.Stop()
+	d.tasks = make(chan *task.Task, d.numWorkers)
+	d.ready = make(chan struct{}, 1)
+	d.availableWorkers = make(chan struct{}, d.numWorkers)
+	d.availableWorkers <- struct{}{}
+
+	var processed []string
+	d.client.Register(NewQueue(func(ctx context.Context, tk testTask) error {
+		processed = append(processed, tk.Val)
+		return nil
+	}))
+	ids, err := d.client.Add(testTask{Val: "first"}, testTask{Val: "second"}).At(now()).Save()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d.fetch()
+	select {
+	case <-d.ready:
+	default:
+		t.Fatal("remaining due task did not trigger a fetch")
+	}
+	if len(d.tasks) != 1 {
+		t.Fatalf("expected one dispatched task, got %d", len(d.tasks))
+	}
+	rows := testutil.GetTasks(t, d.client.db)
+	if len(rows) != 2 {
+		t.Fatalf("expected two queued tasks, got %d", len(rows))
+	}
+	if rows[0].ClaimedAt == nil || rows[1].ClaimedAt != nil {
+		t.Fatal("only the dispatched task should be claimed")
+	}
+
+	d.processTask(<-d.tasks)
+	d.availableWorkers <- struct{}{}
+	d.fetch()
+	if len(d.tasks) != 1 {
+		t.Fatalf("expected one dispatched task, got %d", len(d.tasks))
+	}
+	testutil.Equal(t, "pending triggers", 0, len(d.ready))
+	d.processTask(<-d.tasks)
+
+	if len(processed) != 2 {
+		t.Fatalf("expected two processed tasks, got %d", len(processed))
+	}
+	testutil.Equal(t, "first task", "first", processed[0])
+	testutil.Equal(t, "second task", "second", processed[1])
+	testutil.Length(t, testutil.GetTasks(t, d.client.db), 0)
+	testutil.CompleteTaskIDsExist(t, d.client.db, ids)
+}
+
 func newDispatcher(t *testing.T) *dispatcher {
 	return &dispatcher{
 		numWorkers: 3,
