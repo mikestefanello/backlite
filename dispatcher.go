@@ -329,7 +329,7 @@ func (d *dispatcher) schedule(t *task.Task) {
 		}
 
 		dur := t.WaitUntil.Sub(now())
-		if dur < 0 {
+		if dur <= 0 {
 			d.ready <- struct{}{}
 			return
 		}
